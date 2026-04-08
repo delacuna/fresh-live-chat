@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://spoilershield.example/knowledge-base-schema.json",
+  "title": "SpoilerShield Knowledge Base",
+  "description": "ゲームごとのネタバレ知識ベースのスキーマ",
+  "type": "object",
+  "required": ["id", "title", "title_aliases", "progress_type", "chapters", "spoiler_entities", "global_spoilers"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "ゲームの一意ID（kebab-case）",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+    },
+    "title": {
+      "type": "string",
+      "description": "ゲームの正式タイトル（日本語）"
+    },
+    "title_aliases": {
+      "type": "array",
+      "description": "略称・別タイトル（英語版タイトル等）",
+      "items": { "type": "string" },
+      "minItems": 0
+    },
+    "progress_type": {
+      "type": "string",
+      "enum": ["chapter", "event"],
+      "description": "進行管理モデル"
+    },
+    "chapters": {
+      "type": "array",
+      "description": "チャプター一覧（progress_type が chapter の場合に使用）",
+      "items": { "$ref": "#/$defs/chapter" },
+      "minItems": 1
+    },
+    "events": {
+      "type": "array",
+      "description": "イベント一覧（progress_type が event の場合に使用）",
+      "items": { "$ref": "#/$defs/event" }
+    },
+    "spoiler_entities": {
+      "type": "array",
+      "description": "各チャプター/イベントに紐づくネタバレエンティティ",
+      "items": { "$ref": "#/$defs/spoilerEntity" }
+    },
+    "global_spoilers": {
+      "type": "array",
+      "description": "話をまたぐ伏線・作品全体に関わるネタバレ",
+      "items": { "$ref": "#/$defs/spoilerEntity" }
+    }
+  },
+  "$defs": {
+    "chapter": {
+      "type": "object",
+      "required": ["id", "number", "title", "description"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+        },
+        "number": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "title": { "type": "string" },
+        "description": { "type": "string" }
+      }
+    },
+    "event": {
+      "type": "object",
+      "required": ["id", "title", "description", "spoiler_entity_ids"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+        },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "spoiler_entity_ids": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "spoilerEntity": {
+      "type": "object",
+      "required": ["id", "name", "aliases", "keywords", "category", "spoiler_level", "description"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+          "description": "一意ID（kebab-case）"
+        },
+        "name": {
+          "type": "string",
+          "description": "エンティティ名（人名・アイテム名等）"
+        },
+        "aliases": {
+          "type": "array",
+          "description": "別名・英語表記・略称",
+          "items": { "type": "string" }
+        },
+        "unlocked_after_chapter": {
+          "type": "string",
+          "description": "このネタバレが解禁されるチャプターID。省略時は全チャプターでブロック対象"
+        },
+        "unlocked_after_event": {
+          "type": "string",
+          "description": "このネタバレが解禁されるイベントID（eventモデル用）"
+        },
+        "keywords": {
+          "type": "array",
+          "description": "Stage 1 キーワードフィルタ用（日本語・英語両方推奨）",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "character_death",
+            "plot_twist",
+            "boss_encounter",
+            "item_location",
+            "ending",
+            "foreshadowing",
+            "gameplay_hint",
+            "other"
+          ]
+        },
+        "spoiler_level": {
+          "type": "string",
+          "enum": ["direct_spoiler", "foreshadowing_hint", "gameplay_hint"],
+          "description": "Stage 2 LLM 判定ヒント: ネタバレの重大度"
+        },
+        "description": {
+          "type": "string",
+          "description": "Stage 2 LLM への文脈情報（プロンプトに組み込む）"
+        }
+      }
+    }
+  }
+}

@@ -5,15 +5,6 @@
  */
 export type ProgressModel = "chapter" | "event";
 
-export interface Game {
-  id: string;
-  title: string;
-  titleAliases?: string[];  // 略称・別表記
-  progressModel: ProgressModel;
-  chapters?: Chapter[];     // chapterモデル時のみ
-  events?: GameEvent[];     // eventモデル時のみ
-}
-
 export interface Chapter {
   id: string;
   number: number;
@@ -32,6 +23,10 @@ export interface GameEvent {
 export interface SpoilerEntity {
   id: string;
   gameId: string;
+  /** エンティティ名（人名・アイテム名等） */
+  name?: string;
+  /** 別名・英語表記・略称 */
+  aliases?: string[];
   /** ネタバレが解禁されるチャプターID（chapterモデル） */
   unlockedAfterChapter?: string;
   /** ネタバレが解禁されるイベントID（eventモデル） */
@@ -40,7 +35,24 @@ export interface SpoilerEntity {
   keywords: string[];
   /** カテゴリ */
   category: SpoilerCategory;
+  /** LLMへの判定ヒント: どのレベルのネタバレか */
+  spoilerLevel?: SpoilerLevel;
   description?: string;
+}
+
+/** Stage 2 LLM 判定カテゴリと連動するネタバレレベル */
+export type SpoilerLevel = "direct_spoiler" | "foreshadowing_hint" | "gameplay_hint";
+
+export interface Game {
+  id: string;
+  title: string;
+  titleAliases?: string[];
+  progressModel: ProgressModel;
+  chapters?: Chapter[];
+  events?: GameEvent[];
+  spoilerEntities: SpoilerEntity[];
+  /** 話をまたぐ伏線・全体ストーリーに関わるネタバレ */
+  globalSpoilers?: SpoilerEntity[];
 }
 
 export type SpoilerCategory =

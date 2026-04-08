@@ -1,0 +1,333 @@
+{
+  "$schema": "../schema.json",
+  "id": "ace-attorney-1",
+  "title": "逆転裁判",
+  "title_aliases": [
+    "Phoenix Wright: Ace Attorney",
+    "Phoenix Wright Ace Attorney",
+    "逆転裁判1",
+    "GS1"
+  ],
+  "progress_type": "chapter",
+  "chapters": [
+    {
+      "id": "ch1",
+      "number": 1,
+      "title": "第1話 初めての逆転",
+      "description": "成歩堂龍一が弁護士として初めて法廷に立つチュートリアル事件。被告人は矢張政志、被害者は高日美佳。"
+    },
+    {
+      "id": "ch2",
+      "number": 2,
+      "title": "第2話 逆転姉妹",
+      "description": "恩師・綾里千尋が事務所で殺される。被疑者として逮捕された霊媒師見習いの綾里真宵を成歩堂が弁護する。"
+    },
+    {
+      "id": "ch3",
+      "number": 3,
+      "title": "第3話 逆転のトノサマン",
+      "description": "人気特撮番組「トノサマン」の撮影スタジオで起きた殺人事件。俳優の荷星三郎を成歩堂が弁護する。"
+    },
+    {
+      "id": "ch4",
+      "number": 4,
+      "title": "第4話 逆転、そしてサヨナラ",
+      "description": "湖畔での殺人事件と、15年前の未解決事件「DL-6号事件」が交錯する。御剣怜侍が被告となり、成歩堂が弁護する。"
+    },
+    {
+      "id": "ch5",
+      "number": 5,
+      "title": "第5話 蘇る逆転",
+      "description": "（DS版追加エピソード）被告人は検事正の宝月巴。警察内部で起きた多田敷道夫の殺人事件と、2年前の未解決事件「SL-9号事件」の真相が交錯する。"
+    }
+  ],
+  "spoiler_entities": [
+    {
+      "id": "ch1-victim-cindy",
+      "name": "高日美佳",
+      "aliases": ["Cindy Stone"],
+      "unlocked_after_chapter": "ch1",
+      "keywords": ["高日", "高日美佳", "Cindy Stone", "Cindy", "被害者"],
+      "category": "other",
+      "spoiler_level": "direct_spoiler",
+      "description": "第1話の被害者。矢張政志の元カノ。"
+    },
+    {
+      "id": "ch1-culprit-sahwit",
+      "name": "山野星雄",
+      "aliases": ["Frank Sahwit", "山野"],
+      "unlocked_after_chapter": "ch1",
+      "keywords": ["山野", "山野星雄", "Frank Sahwit", "Sahwit", "犯人"],
+      "category": "plot_twist",
+      "spoiler_level": "direct_spoiler",
+      "description": "第1話の犯人。空き巣中に被害者に目撃されたため殺害した。"
+    },
+    {
+      "id": "ch1-weapon-clock",
+      "name": "置き時計（凶器）",
+      "aliases": ["clock", "the clock", "時計"],
+      "unlocked_after_chapter": "ch1",
+      "keywords": ["置き時計", "時計", "凶器", "clock"],
+      "category": "item_location",
+      "spoiler_level": "gameplay_hint",
+      "description": "第1話の凶器。テレビのリモコンと見誤られた点が論点になる。"
+    },
+    {
+      "id": "ch2-victim-mia",
+      "name": "綾里千尋（死亡）",
+      "aliases": ["Mia Fey", "綾里先生", "千尋"],
+      "unlocked_after_chapter": "ch2",
+      "keywords": ["綾里千尋", "千尋", "Mia Fey", "Mia", "死んだ", "殺された", "被害者"],
+      "category": "character_death",
+      "spoiler_level": "direct_spoiler",
+      "description": "成歩堂の師匠・綾里千尋が第2話冒頭で殺害される。以降は真宵の口寄せを通じて登場。"
+    },
+    {
+      "id": "ch2-culprit-redd-white",
+      "name": "小中大",
+      "aliases": ["Redd White", "ブルーコープ", "Bluecorp"],
+      "unlocked_after_chapter": "ch2",
+      "keywords": ["小中", "小中大", "Redd White", "ブルーコープ", "Bluecorp", "犯人"],
+      "category": "plot_twist",
+      "spoiler_level": "direct_spoiler",
+      "description": "第2話の犯人。情報を武器に各界の有力者を脅迫していた実業家。千尋の過去の調査を阻むために殺害した。"
+    },
+    {
+      "id": "ch2-maya-suspect",
+      "name": "綾里真宵（容疑者として誤認逮捕）",
+      "aliases": ["Maya Fey", "真宵", "Maya"],
+      "unlocked_after_chapter": "ch2",
+      "keywords": ["綾里真宵", "真宵", "Maya Fey", "Maya", "逮捕", "容疑者"],
+      "category": "plot_twist",
+      "spoiler_level": "foreshadowing_hint",
+      "description": "第2話で姉・千尋の殺人犯として誤認逮捕される。実際は無実で、成歩堂の弁護により釈放される。"
+    },
+    {
+      "id": "ch2-channeling",
+      "name": "口寄せ（綾里家の霊媒能力）",
+      "aliases": ["channeling", "spirit channeling", "霊媒", "霊術"],
+      "unlocked_after_chapter": "ch2",
+      "keywords": ["口寄せ", "霊媒", "霊術", "channeling", "spirit channeling", "千尋を呼ぶ"],
+      "category": "plot_twist",
+      "spoiler_level": "foreshadowing_hint",
+      "description": "綾里家に伝わる霊術。真宵が千尋の霊を呼び出すことができ、千尋は死後も真宵の口寄せを通じて成歩堂を助ける。"
+    },
+    {
+      "id": "ch3-defendant-will-powers",
+      "name": "荷星三郎",
+      "aliases": ["Will Powers", "トノサマン", "Steel Samurai"],
+      "unlocked_after_chapter": "ch3",
+      "keywords": ["荷星", "荷星三郎", "Will Powers", "トノサマン", "被告"],
+      "category": "other",
+      "spoiler_level": "foreshadowing_hint",
+      "description": "第3話の被告人。特撮番組「トノサマン」の主演俳優。"
+    },
+    {
+      "id": "ch3-victim-hammer",
+      "name": "衣袋武志",
+      "aliases": ["Jack Hammer", "トノサマンの元俳優", "Evil Magistrate"],
+      "unlocked_after_chapter": "ch3",
+      "keywords": ["衣袋", "衣袋武志", "Jack Hammer", "Hammer", "被害者", "トノサマン", "元俳優"],
+      "category": "plot_twist",
+      "spoiler_level": "direct_spoiler",
+      "description": "第3話の真の被害者。トノサマンの元主演俳優。過去の事故でキャリアを失い、復讐を図るが逆に殺された。"
+    },
+    {
+      "id": "ch3-culprit-dee-vasquez",
+      "name": "姫神サクラ",
+      "aliases": ["Dee Vasquez", "プロデューサー"],
+      "unlocked_after_chapter": "ch3",
+      "keywords": ["姫神", "姫神サクラ", "Dee Vasquez", "プロデューサー", "マフィア", "犯人"],
+      "category": "plot_twist",
+      "spoiler_level": "direct_spoiler",
+      "description": "第3話の犯人。トノサマンのプロデューサー。過去の事故の隠蔽のために衣袋武志を殺害した。"
+    },
+    {
+      "id": "ch3-past-accident",
+      "name": "5年前の事故（スタジオ）",
+      "aliases": ["the accident", "過去の事故", "Global Studios incident"],
+      "unlocked_after_chapter": "ch3",
+      "keywords": ["5年前", "事故", "スタジオ", "グローバルスタジオ", "Global Studios"],
+      "category": "foreshadowing",
+      "spoiler_level": "foreshadowing_hint",
+      "description": "第3話の核心。5年前に衣袋武志がスタジオで起こした事故が、今回の事件の動機につながる。"
+    },
+    {
+      "id": "ch4-culprit-von-karma",
+      "name": "狩魔豪",
+      "aliases": ["Manfred von Karma", "狩魔", "フォン・カルマ"],
+      "unlocked_after_chapter": "ch4",
+      "keywords": ["狩魔", "狩魔豪", "Manfred von Karma", "von Karma", "フォン・カルマ", "犯人"],
+      "category": "plot_twist",
+      "spoiler_level": "direct_spoiler",
+      "description": "第4話の犯人。完璧な有罪率を誇る伝説の検事。実はDL-6号事件の真犯人であり、御剣信を15年前に射殺していた。"
+    },
+    {
+      "id": "ch4-dl6-truth",
+      "name": "DL-6号事件の真相",
+      "aliases": ["DL-6", "DL6", "the DL-6 incident", "15年前の事件"],
+      "unlocked_after_chapter": "ch4",
+      "keywords": ["DL-6", "DL6", "15年前", "真相", "御剣信", "Gregory Edgeworth", "エレベーター"],
+      "category": "plot_twist",
+      "spoiler_level": "direct_spoiler",
+      "description": "15年前、エレベーターで起きた事件の真相。御剣信（Gregory Edgeworth）は狩魔豪に撃たれて死亡していた。狩魔は証拠隠滅のため御剣怜侍を犯人に仕立てようとした。"
+    },
+    {
+      "id": "ch4-victim-hammond",
+      "name": "生倉雪夫",
+      "aliases": ["Robert Hammond", "ハモンド"],
+      "unlocked_after_chapter": "ch4",
+      "keywords": ["生倉", "生倉雪夫", "Robert Hammond", "Hammond", "悪徳弁護士", "湖"],
+      "category": "plot_twist",
+      "spoiler_level": "direct_spoiler",
+      "description": "第4話の被害者。DL-6号事件に関わった弁護士。狩魔に射殺された。"
+    },
+    {
+      "id": "ch4-yanni-yogi",
+      "name": "灰根高太郎",
+      "aliases": ["Yanni Yogi"],
+      "unlocked_after_chapter": "ch4",
+      "keywords": ["灰根", "灰根高太郎", "Yanni Yogi", "Yogi", "湖", "管理人"],
+      "category": "plot_twist",
+      "spoiler_level": "direct_spoiler",
+      "description": "第4話に登場するDL-6号事件の関係者。"
+    },
+    {
+      "id": "ch4-edgeworth-father",
+      "name": "御剣信",
+      "aliases": ["Gregory Edgeworth", "御剣怜侍の父"],
+      "unlocked_after_chapter": "ch4",
+      "keywords": ["御剣信", "Gregory Edgeworth", "怜侍の父", "弁護士", "射殺", "狩魔に殺された"],
+      "category": "character_death",
+      "spoiler_level": "direct_spoiler",
+      "description": "御剣怜侍の父。狩魔豪と対立した腕利き弁護士だったが、DL-6号事件で狩魔に殺された。"
+    },
+    {
+      "id": "ch4-edgeworth-trauma",
+      "name": "御剣怜侍の過去のトラウマ",
+      "aliases": ["Edgeworth's trauma", "怜侍のトラウマ", "御剣の秘密"],
+      "unlocked_after_chapter": "ch4",
+      "keywords": ["怜侍", "御剣", "トラウマ", "父を殺した", "地震", "銃"],
+      "category": "plot_twist",
+      "spoiler_level": "direct_spoiler",
+      "description": "御剣怜侍は自分が父親を殺したと思い込んでいた。第4話の裁判でDL-6号事件の真相が明かされる。"
+    },
+    {
+      "id": "ch5-victim-goodman",
+      "name": "多田敷道夫",
+      "aliases": ["Bruce Goodman"],
+      "unlocked_after_chapter": "ch5",
+      "keywords": ["多田敷", "多田敷道夫", "Bruce Goodman", "Goodman", "被害者", "刑事"],
+      "category": "other",
+      "spoiler_level": "direct_spoiler",
+      "description": "第5話の被害者。SL-9号事件の主任捜査官だった刑事。"
+    },
+    {
+      "id": "ch5-defendant-lana",
+      "name": "宝月巴",
+      "aliases": ["Lana Skye", "宝月検事正", "チーフ検事"],
+      "unlocked_after_chapter": "ch5",
+      "keywords": ["宝月巴", "宝月", "Lana Skye", "Lana", "被告", "検事正"],
+      "category": "plot_twist",
+      "spoiler_level": "direct_spoiler",
+      "description": "第5話の被告人。宝月茜の姉で、検事正。殺人の容疑をかけられるが真相には深い事情がある。"
+    },
+    {
+      "id": "ch5-culprit-damon-gant",
+      "name": "巌徒海慈",
+      "aliases": ["Damon Gant", "Gant", "署長", "警察署長"],
+      "unlocked_after_chapter": "ch5",
+      "keywords": ["巌徒", "巌徒海慈", "Damon Gant", "Gant", "署長", "警察署長", "犯人"],
+      "category": "plot_twist",
+      "spoiler_level": "direct_spoiler",
+      "description": "第5話の犯人。警察署長でありながらSL-9号事件の証拠を隠蔽し、自らも殺人を犯した。"
+    },
+    {
+      "id": "ch5-sl9-truth",
+      "name": "SL-9号事件の真相",
+      "aliases": ["SL-9", "SL9", "the SL-9 incident", "2年前の事件"],
+      "unlocked_after_chapter": "ch5",
+      "keywords": ["SL-9", "SL9", "2年前", "真相", "証拠改ざん"],
+      "category": "plot_twist",
+      "spoiler_level": "direct_spoiler",
+      "description": "第5話の核心となる2年前の未解決事件。巌徒海慈が証拠を操作して犯人逮捕を主導したが、その過程に重大な不正があった。"
+    },
+    {
+      "id": "ch5-sl9-victim-neil",
+      "name": "罪門直斗",
+      "aliases": ["Neil Marshall"],
+      "unlocked_after_chapter": "ch5",
+      "keywords": ["罪門直斗", "罪門", "Neil Marshall", "Neil", "SL-9", "殺された"],
+      "category": "character_death",
+      "spoiler_level": "direct_spoiler",
+      "description": "SL-9号事件で死亡した人物。罪門恭介の関係者。"
+    },
+    {
+      "id": "ch5-joe-darke",
+      "name": "青影丈",
+      "aliases": ["Joe Darke", "連続殺人犯"],
+      "unlocked_after_chapter": "ch5",
+      "keywords": ["青影", "青影丈", "Joe Darke", "Darke", "連続殺人犯", "SL-9"],
+      "category": "plot_twist",
+      "spoiler_level": "direct_spoiler",
+      "description": "SL-9号事件で逮捕された連続殺人犯。第5話の事件の背景に深く関係する。"
+    },
+    {
+      "id": "ch5-ema-skye",
+      "name": "宝月茜",
+      "aliases": ["Ema Skye", "Ema"],
+      "unlocked_after_chapter": "ch5",
+      "keywords": ["宝月茜", "宝月", "Ema Skye", "Ema", "SL-9", "科学捜査"],
+      "category": "plot_twist",
+      "spoiler_level": "direct_spoiler",
+      "description": "科学捜査を志す少女。宝月巴の妹で、SL-9号事件の目撃者。第5話では成歩堂の助手を務める。"
+    }
+  ],
+  "global_spoilers": [
+    {
+      "id": "global-mia-alive-via-maya",
+      "name": "綾里千尋の口寄せによる活躍",
+      "aliases": ["Mia through Maya", "千尋の霊"],
+      "keywords": ["千尋", "口寄せ", "Mia", "霊", "真宵から千尋", "spirit channeling"],
+      "category": "plot_twist",
+      "spoiler_level": "foreshadowing_hint",
+      "description": "千尋は第2話で死亡するが、真宵の口寄せを通じて第3話・第4話でも成歩堂を助ける。「千尋が死んでいる」という事実と「口寄せで戻ってくる」という展開の両方がネタバレとなる。"
+    },
+    {
+      "id": "global-edgeworth-ally",
+      "name": "御剣怜侍の心境変化（敵から協力者へ）",
+      "aliases": ["Edgeworth becomes ally", "御剣の変化"],
+      "keywords": ["御剣", "怜侍", "Edgeworth", "協力", "改心", "変わった"],
+      "category": "plot_twist",
+      "spoiler_level": "foreshadowing_hint",
+      "description": "当初は敵対する検事だった御剣怜侍が、第4話の裁判を経て成歩堂を認め、心境が変化する。シリーズの核心的な関係性の変化。"
+    },
+    {
+      "id": "global-dl6-overarching",
+      "name": "DL-6号事件（シリーズ全体を貫く謎）",
+      "aliases": ["DL-6 incident", "DL-6事件", "15年前の謎"],
+      "keywords": ["DL-6", "DL6", "15年前", "未解決事件", "御剣の過去"],
+      "category": "foreshadowing",
+      "spoiler_level": "foreshadowing_hint",
+      "description": "第4話で解明される作品全体を貫く謎。「DL-6」という単語が言及された場合、第4話のネタバレに直結する可能性がある。"
+    },
+    {
+      "id": "global-von-karma-nemesis",
+      "name": "狩魔豪と御剣家の因縁",
+      "aliases": ["von Karma and Edgeworths", "狩魔と御剣の因縁"],
+      "keywords": ["狩魔", "狩魔豪", "von Karma", "御剣", "因縁", "宿敵", "弟子"],
+      "category": "plot_twist",
+      "spoiler_level": "foreshadowing_hint",
+      "description": "御剣怜侍は父を殺した狩魔豪に弟子として育てられた。この関係性は第4話のどんでん返しの根幹をなす。"
+    },
+    {
+      "id": "global-phoenix-maya-bond",
+      "name": "成歩堂と綾里真宵のパートナー関係",
+      "aliases": ["Phoenix and Maya partnership", "成歩堂と真宵"],
+      "keywords": ["真宵", "Maya", "助手", "パートナー", "綾里事務所"],
+      "category": "other",
+      "spoiler_level": "foreshadowing_hint",
+      "description": "千尋の死後、真宵が成歩堂の助手としてシリーズを通じて行動をともにする。「成歩堂が真宵を助手にした」こと自体が第2話以降のネタバレ。"
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "name": "@spoilershield/knowledge-base",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./data/*": "./data/*.json"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "validate": "node --input-type=module < scripts/validate.mjs",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@spoilershield/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  }
+}

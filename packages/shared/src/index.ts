@@ -4,6 +4,7 @@ export type {
   GameEvent,
   SpoilerEntity,
   SpoilerCategory,
+  SpoilerLevel,
   ProgressModel,
 } from "./types/game.js";
 
