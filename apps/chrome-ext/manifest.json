@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "SpoilerShield",
+  "version": "0.1.0",
+  "description": "ゲーム配信のチャットからネタバレをフィルタします",
+  "permissions": ["storage"],
+  "host_permissions": ["*://www.youtube.com/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://www.youtube.com/*"],
+      "js": ["content.js"],
+      "all_frames": true,
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup/index.html",
+    "default_title": "SpoilerShield"
+  }
+}
