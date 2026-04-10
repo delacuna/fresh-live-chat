@@ -18,7 +18,6 @@ switch (mode) {
     break;
   case 'live':
     // Phase 3 で実装予定
-    console.log('[SpoilerShield] ライブモード（未実装）');
     registerShortcut();
     break;
   case 'none':
@@ -39,7 +38,5 @@ function registerShortcut(): void {
     const settings = await loadSettings();
     const next: Settings = { ...settings, enabled: !settings.enabled };
     await saveSettings(next);
-
-    console.log(`[SpoilerShield] フィルタ ${next.enabled ? 'ON' : 'OFF'}`);
   });
 }

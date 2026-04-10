@@ -67,6 +67,5 @@ export async function loadSettings(): Promise<Settings> {
 
 /** chrome.storage.local に設定を保存する */
 export async function saveSettings(settings: Settings): Promise<void> {
-  console.log('[SpoilerShield][storage.set]', { caller: 'content/shortcut', enabled: settings.enabled });
   await chrome.storage.local.set({ [STORAGE_KEY]: settings });
 }

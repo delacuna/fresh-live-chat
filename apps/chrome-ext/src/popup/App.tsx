@@ -160,7 +160,6 @@ export default function App() {
   const update = (partial: Partial<Settings>) => {
     const next = { ...settings, ...partial };
     setSettings(next);
-    console.log('[SpoilerShield][storage.set]', { caller: 'popup', keys: Object.keys(partial), partial });
     chrome.storage.local.set({ [STORAGE_KEY]: next });
   };
 

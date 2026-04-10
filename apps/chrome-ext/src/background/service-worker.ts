@@ -6,6 +6,6 @@
  * Phase 3 以降で proxy への通信・キャッシュ管理等に活用する。
  */
 
-chrome.runtime.onInstalled.addListener((details) => {
-  console.log('[SpoilerShield] インストール完了:', details.reason);
+chrome.runtime.onInstalled.addListener((_details) => {
+  // Phase 3 で初期化処理を追加予定
 });

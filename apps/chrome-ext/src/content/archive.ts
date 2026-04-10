@@ -51,7 +51,7 @@ let isUpdatingDisplayMode = false;
 const revealedTexts = new Set<string>();
 
 export function startArchiveMode(): void {
-  console.log('[SpoilerShield] アーカイブモード開始:', location.href);
+  console.log('[SpoilerShield] アーカイブモードで起動しました');
 
   loadSettings().then((settings) => {
     currentSettings = settings;
@@ -141,9 +141,7 @@ function waitForItemsContainer(): void {
  * #items コンテナを監視し、追加された子要素に Stage 1 フィルタを適用する。
  */
 function observeItems(itemsContainer: Element): void {
-  console.log('[SpoilerShield] チャット監視を開始しました');
   itemsContainerRef = itemsContainer;
-  console.log(`[SpoilerShield] キーワード数: ${currentKeywords.size}`);
 
   itemsContainer.querySelectorAll(MSG_TEXT_SELECTOR).forEach((el) => {
     processMessage(el);
@@ -158,7 +156,7 @@ function observeItems(itemsContainer: Element): void {
     const hasRemovals = mutations.some((m) => m.removedNodes.length > 0);
     if (hasRemovals) {
       revealedTexts.clear();
-      console.log('[SpoilerShield] シークを検知: revealedTexts をリセットしました');
+
     }
 
     for (const mutation of mutations) {
@@ -224,22 +222,10 @@ function processMessage(el: Element): void {
   if (revealedTexts.has(text)) return;
 
   const matchResult = matchesKeyword(text, currentKeywords, currentDescriptionPhrases);
-  const debugContext = {
-    game: currentSettings.gameId,
-    progress: currentSettings.progressByGame[currentSettings.gameId] ?? '未設定',
-    filterMode: currentSettings.filterMode,
-  };
 
   if (matchResult !== null) {
-    console.log('[SpoilerShield] ✅ フィルタ対象', {
-      text,
-      reason: matchResult.reason,
-      matchedKeyword: matchResult.keyword ?? null,
-      matchedVerb: matchResult.verb ?? null,
-      matchedPhrase: matchResult.phrase ?? null,
-      ...debugContext,
-      result: 'フィルタする',
-    });
+    const matchInfo = matchResult.keyword ?? matchResult.phrase ?? matchResult.reason;
+    console.log(`[SpoilerShield] フィルタ: "${text}" (${matchInfo})`);
     filterMessageElement(
       el,
       currentSettings.displayMode,
@@ -251,7 +237,6 @@ function processMessage(el: Element): void {
     chrome.storage.local.get(FILTER_COUNT_KEY, (result) => {
       const prev = (result[FILTER_COUNT_KEY] as number | undefined) ?? 0;
       const next = prev + 1;
-      console.log('[SpoilerShield][storage.set] filterCount++', { caller: 'content', filterCount: next });
       chrome.storage.local.set({ [FILTER_COUNT_KEY]: next });
     });
   }

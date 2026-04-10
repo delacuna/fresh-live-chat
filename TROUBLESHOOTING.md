@@ -191,3 +191,93 @@ LLMの生成結果を鵜呑みにせず、**ゲームを実際にプレイした
 - 「それらしい名前」が生成されると人間も気づきにくいため、**ユーザー側の一次情報提供が最も確実な防衛策**
 
 ---
+
+## #005 クリックして表示したコメントがすぐ再フィルタされる
+
+**日付:** 2026-04-10
+
+### 起きたこと
+
+- フィルタされたコメント（プレースホルダー表示）をクリックすると元のテキストが一瞬だけ見えるが、すぐにプレースホルダーに戻る
+- クリックによる展開が実質的に機能しない状態
+
+### 原因（2点）
+
+**原因1: YouTubeがテキスト変更を検知して要素を差し替える**
+
+`restoreMessageElement()` が `el.textContent = original` でテキストを書き戻した際、YouTubeの内部処理がこの変更を検知し、親要素（`yt-live-chat-text-message-renderer`）を新しいDOMノードで差し替える。新しいノードには `data-spoilershield-filtered` 属性がないため、MutationObserver が `processMessage()` を呼んで再フィルタしてしまう。
+
+**原因2: revealedTexts が巻き戻し後もクリアされない**
+
+`revealedTexts`（ユーザーが展開したテキストを記録するSet）はセッション中に蓄積されるが、再生位置を巻き戻してチャットが再レンダリングされると、同じテキストのコメントが新しいDOM要素として追加される。`revealedTexts` が残っているため、巻き戻し後も同じテキストがフィルタされなくなる。
+
+### 解決策
+
+**原因1への対応:**
+
+- クリック時に `ATTR_FILTERED` を `'true'` から `'revealed'` に変更する（`restoreMessageElement` は呼ばない）
+- `processMessage()` で `el.hasAttribute(ATTR_FILTERED)` を先頭でチェックし、値が何であれ属性が付いている要素はスキップする
+- YouTubeがDOMを差し替えて新しいノードが追加された場合に備え、`revealedTexts` にオリジナルテキストを記録。`processMessage()` でこのSetを参照してスキップする
+
+**原因2への対応:**
+
+- `itemsObserver` のコールバックで `removedNodes.length > 0` を検知したら「シーク発生」と判定し、`revealedTexts.clear()` を呼ぶ
+- 巻き戻し後は `revealedTexts` が空になるため、同じテキストのコメントが再びフィルタ対象になる
+
+### 教訓
+
+- YouTubeはextensionによるテキスト変更を検知して要素を再生成することがある。DOM操作の結果が「元に戻る」場合はこの挙動を疑う
+- 展開済みテキストを記録するSetは、シーク（DOMの大規模再構築）のタイミングでリセットする必要がある
+
+---
+
+## #006 表示方式（プレースホルダー/完全非表示）の切り替えが不安定・フラッシュが発生する
+
+**日付:** 2026-04-10
+
+### 起きたこと
+
+- ポップアップUIで表示方式を切り替えると、フィルタ済みコメントが一瞬だけ元のテキストで表示されてからプレースホルダー/非表示に切り替わる（フラッシュ）
+- ポップアップを再度開くと設定が元に戻っている（切り替えが保存されない）
+- 上記2つが同時に起きるパターンもある
+
+### 原因
+
+**原因1: 全復元→全再フィルタの2パスによるフラッシュ**
+
+設定変更時に `reprocessAll()` を呼んでいた。この処理は「全フィルタ済み要素を `restoreMessageElement()` で復元 → 全メッセージを `processMessage()` で再フィルタ」の2パス構造になっており、復元と再フィルタの間の一瞬、元テキストがユーザーに見えてしまう。
+
+**原因2: Content Script と ポップアップの storage.set 競合**
+
+フィルタカウント（`filterCount`）のインクリメントは、Content Script が設定オブジェクト全体をストレージに書き戻す形で実装されていた（`{ ...currentSettings, filterCount: N }`）。ポップアップが `displayMode` を変更して書き込んだ直後に、Content Script の書き込みが後から到着すると、古い `displayMode` で上書きされる。
+
+この競合はさらに `chrome.storage.onChanged` を通じて Content Script 自身にも伝わり、「`displayMode` が変わった」という誤検知で `switchDisplayMode()` が逆方向に呼ばれるという二重の問題を引き起こしていた。
+
+### 解決策
+
+**原因1への対応: `switchDisplayMode()` 関数の追加**
+
+`displayMode` のみの変更時は `reprocessAll()` を使わず、フィルタ済み要素の表示方式を直接書き換える専用関数 `switchDisplayMode()` を実装。
+
+- `placeholder → hidden`: テキストを元に戻してから行コンテナを `display:none` にする（元テキストが見える瞬間はない）
+- `hidden → placeholder`: プレースホルダーテキストを書き込んでから行コンテナの `display:none` を解除する（元テキストが見える瞬間はない）
+
+`chrome.storage.onChanged` で変更内容を比較し、`displayMode` のみが変わった場合は `switchDisplayMode()` を、それ以外（`filterMode`・`progress`・`enabled`・`gameId` の変更）は `reprocessAll()` を使うよう分岐した。
+
+**原因2への対応: `filterCount` を独立したストレージキーに分離**
+
+`filterCount` 専用のキー `spoilershield_filter_count` を新設し、書き込み主体をキーごとに完全分離した。
+
+| キー | 書き込み主体 | 内容 |
+|---|---|---|
+| `spoilershield_settings` | ポップアップのみ | displayMode, filterMode, gameId, enabled, progress |
+| `spoilershield_filter_count` | Content Script のみ | フィルタカウント |
+
+これにより2つの書き込みが同じオブジェクトを奪い合う状況がなくなり、競合が根本から解消された。
+
+### 教訓
+
+- 複数の書き込み主体が同じストレージキーを更新する設計は、非同期タイミングによって互いの変更を上書きするリスクがある。書き込み主体をキーごとに1つに限定する
+- `reprocessAll()` のような「全復元→全再フィルタ」パターンは視覚的なフラッシュを生む。表示属性だけ変えるケースには差分更新の専用関数を用意する
+
+---
