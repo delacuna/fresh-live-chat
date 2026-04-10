@@ -8,7 +8,12 @@
  */
 
 import { buildKeywordSet, matchesKeyword } from './filter.js';
-import { filterMessageElement } from './chat-dom.js';
+import { filterMessageElement, restoreMessageElement } from './chat-dom.js';
+import {
+  loadSettings,
+  STORAGE_KEY,
+  type Settings,
+} from '../shared/settings.js';
 
 /** YouTube チャットリプレイのメッセージコンテナ */
 const ITEMS_SELECTOR = '#items';
@@ -16,9 +21,43 @@ const ITEMS_SELECTOR = '#items';
 /** 各チャットメッセージのテキスト要素 */
 const MSG_TEXT_SELECTOR = '#message';
 
+/** フィルタ済みメッセージを検索するセレクタ */
+const FILTERED_SELECTOR = '[data-spoilershield-filtered="true"]';
+
+let currentSettings: Settings | null = null;
+let currentKeywords: Set<string> = new Set();
+let itemsContainerRef: Element | null = null;
+
 export function startArchiveMode(): void {
   console.log('[SpoilerShield] アーカイブモード開始:', location.href);
-  waitForItemsContainer();
+
+  // 設定を読み込んでから監視開始
+  loadSettings().then((settings) => {
+    currentSettings = settings;
+    currentKeywords = buildKeywordsFromSettings(settings);
+
+    // 設定変更をリアルタイムに反映
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area !== 'local' || !changes[STORAGE_KEY]) return;
+      const next = changes[STORAGE_KEY].newValue as Settings;
+      currentSettings = next;
+      currentKeywords = buildKeywordsFromSettings(next);
+
+      // 既存フィルタを全リセットして再適用
+      if (itemsContainerRef) {
+        reprocessAll(itemsContainerRef);
+      }
+    });
+
+    if (settings.enabled) {
+      waitForItemsContainer();
+    }
+  });
+}
+
+function buildKeywordsFromSettings(settings: Settings): Set<string> {
+  const progress = settings.progressByGame[settings.gameId];
+  return buildKeywordSet(settings.gameId, settings.filterMode, progress);
 }
 
 /**
@@ -53,12 +92,12 @@ function waitForItemsContainer(): void {
  */
 function observeItems(itemsContainer: Element): void {
   console.log('[SpoilerShield] チャット監視を開始しました');
-  const keywords = buildKeywordSet();
-  console.log(`[SpoilerShield] キーワード数: ${keywords.size}`);
+  itemsContainerRef = itemsContainer;
+  console.log(`[SpoilerShield] キーワード数: ${currentKeywords.size}`);
 
   // ページ表示時点でレンダリング済みのメッセージを処理
   itemsContainer.querySelectorAll(MSG_TEXT_SELECTOR).forEach((el) => {
-    processMessage(el, keywords);
+    processMessage(el);
   });
 
   // 以降に追加されるメッセージを監視
@@ -66,11 +105,10 @@ function observeItems(itemsContainer: Element): void {
     for (const mutation of mutations) {
       for (const node of mutation.addedNodes) {
         if (!(node instanceof Element)) continue;
-        // 追加されたノード自体が #message の場合と、その子孫に #message がある場合の両方を考慮
         const msgEl = node.matches(MSG_TEXT_SELECTOR)
           ? node
           : node.querySelector(MSG_TEXT_SELECTOR);
-        if (msgEl) processMessage(msgEl, keywords);
+        if (msgEl) processMessage(msgEl);
       }
     }
   });
@@ -78,10 +116,59 @@ function observeItems(itemsContainer: Element): void {
   observer.observe(itemsContainer, { childList: true });
 }
 
-function processMessage(el: Element, keywords: Set<string>): void {
+/**
+ * 既存の全メッセージを復元してから設定に基づいて再フィルタする。
+ * 設定変更（有効/無効・フィルタモード・進行状況）時に呼ばれる。
+ */
+function reprocessAll(itemsContainer: Element): void {
+  // まず全フィルタを解除
+  itemsContainer.querySelectorAll(FILTERED_SELECTOR).forEach((el) => {
+    restoreMessageElement(el);
+  });
+
+  // 有効な場合のみ再フィルタ
+  if (!currentSettings?.enabled) return;
+
+  itemsContainer.querySelectorAll(MSG_TEXT_SELECTOR).forEach((el) => {
+    processMessage(el);
+  });
+}
+
+function processMessage(el: Element): void {
+  if (!currentSettings?.enabled) return;
+
   const text = el.textContent ?? '';
   if (!text.trim()) return;
-  if (matchesKeyword(text, keywords)) {
-    filterMessageElement(el);
+
+  const matchResult = matchesKeyword(text, currentKeywords);
+  const debugContext = {
+    game: currentSettings.gameId,
+    progress: currentSettings.progressByGame[currentSettings.gameId] ?? '未設定',
+    filterMode: currentSettings.filterMode,
+  };
+
+  if (matchResult !== null) {
+    console.log('[SpoilerShield] ✅ フィルタ対象', {
+      text,
+      matchedKeyword: matchResult.keyword,
+      matchedContext: matchResult.contextPattern,
+      ...debugContext,
+      result: 'フィルタする',
+    });
+    filterMessageElement(el, currentSettings.displayMode, matchResult.keyword, matchResult.contextPattern);
+    // フィルタカウントは非同期でインクリメント（カウント失敗はサイレント無視）
+    chrome.storage.local.get(STORAGE_KEY, (result) => {
+      const stored = result[STORAGE_KEY] as Settings | undefined;
+      if (!stored) return;
+      chrome.storage.local.set({ [STORAGE_KEY]: { ...stored, filterCount: stored.filterCount + 1 } });
+    });
+  } else {
+    console.log('[SpoilerShield] ⬜ スルー', {
+      text,
+      matchedKeyword: null,
+      matchedContext: null,
+      ...debugContext,
+      result: 'フィルタしない',
+    });
   }
 }

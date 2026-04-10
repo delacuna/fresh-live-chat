@@ -23,3 +23,5 @@ export type {
 } from "./types/api.js";
 
 export { ok, err } from "./types/api.js";
+
+export { SPOILER_CONTEXT_PATTERNS, matchesSpoilerContext } from "./spoilerContext.js";
