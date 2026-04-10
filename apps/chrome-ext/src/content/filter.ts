@@ -1,7 +1,14 @@
 /**
  * Stage 1 フィルタ: キーワードマッチ（ブラウザ内で完結）
  *
- * 設定（filterMode・progress）に基づいてブロック対象のキーワードセットを構築する。
+ * 方針: 誤検出を最小限にするため「明らかに安全なコメントを通過させる粗フィルタ」として機能する。
+ * 判断が難しいコメントは Stage 2（LLM）に委ねる前提でパスさせる。
+ *
+ * フィルタ対象とするパターン（この3つのみ）:
+ *   1. 「ネタバレ」という単語を含む
+ *   2. 知識ベースの description から抽出した固有フレーズ（英数字含む事件名等）が含まれる
+ *   3. ゲームキーワード + 明確なネタバレ動詞（死んだ・殺した・裏切った等）の組み合わせ
+ *
  * - filterMode: spoiler_level でブロック対象を絞り込む
  * - progress: 現在の進行状況より後のネタバレのみブロック（解禁済みはスルー）
  * - 進行状況未設定の場合は安全側に倒して全キーワードをブロック対象とする
@@ -10,7 +17,7 @@
 import type { KBGame } from '@spoilershield/knowledge-base';
 import aceAttorney1 from '@kb-data/ace-attorney-1.json';
 import { getBlockedLevels, type FilterMode, type GameProgress } from '../shared/settings.js';
-import { matchesSpoilerContext } from '@spoilershield/shared';
+import { matchesSpoilerVerb } from '@spoilershield/shared';
 
 const ALL_GAMES: KBGame[] = [aceAttorney1 as unknown as KBGame];
 
@@ -26,7 +33,6 @@ export function buildKeywordSet(
   const keywords = new Set<string>();
   const chapters = game.chapters ?? [];
 
-  // 現在のチャプターのインデックス（未設定なら -1 → 全てブロック）
   const currentChapterIdx =
     progress?.currentChapterId
       ? chapters.findIndex((c) => c.id === progress.currentChapterId)
@@ -37,20 +43,17 @@ export function buildKeywordSet(
     spoiler_level?: string;
     unlocked_after_chapter?: string;
   }): boolean => {
-    // spoiler_level がブロック対象かチェック
     if (entity.spoiler_level && !blockedLevels.includes(entity.spoiler_level)) return false;
 
-    // チャプターモデル: 進行状況が設定されている場合は解禁済みはスキップ
     if (progress?.progressModel === 'chapter' && entity.unlocked_after_chapter && currentChapterIdx !== -1) {
       const unlockedIdx = chapters.findIndex((c) => c.id === entity.unlocked_after_chapter);
-      // ユーザーが既にそのチャプターを超えていれば解禁済み → ブロック不要
       if (unlockedIdx !== -1 && currentChapterIdx > unlockedIdx) return false;
     }
 
     return true;
   };
 
-  for (const entity of [...game.spoiler_entities, ...game.global_spoilers]) {
+  for (const entity of [...game.spoiler_entities, ...(game.global_spoilers ?? [])]) {
     if (shouldBlock(entity)) {
       for (const kw of entity.keywords) keywords.add(kw);
     }
@@ -59,25 +62,90 @@ export function buildKeywordSet(
   return keywords;
 }
 
+/**
+ * 知識ベースの description から固有フレーズを抽出する。
+ * 「」で括られた文字列のうち、英数字を含むもの（事件コード等）のみ対象とする。
+ * 例: "DL-6号事件"、"SL-9号事件"
+ * ゲームタイトル名等の一般的な固有名詞は対象外（誤検出防止）。
+ */
+export function buildDescriptionPhraseSet(gameId: string): Set<string> {
+  const game = ALL_GAMES.find((g) => g.id === gameId);
+  if (!game) return new Set();
+
+  const phrases = new Set<string>();
+  const QUOTED_RE = /「([^」]+)」/g;
+  const HAS_ALPHANUMERIC_RE = /[\d\w]/;
+
+  const extractFromText = (text: string | undefined) => {
+    if (!text) return;
+    for (const match of text.matchAll(QUOTED_RE)) {
+      const phrase = match[1];
+      if (HAS_ALPHANUMERIC_RE.test(phrase)) {
+        phrases.add(phrase);
+      }
+    }
+  };
+
+  for (const chapter of game.chapters ?? []) {
+    extractFromText(chapter.description);
+  }
+  for (const entity of [...game.spoiler_entities, ...(game.global_spoilers ?? [])]) {
+    extractFromText(entity.description);
+  }
+
+  return phrases;
+}
+
+// ─── マッチ結果 ──────────────────────────────────────────────────────────────
+
+export type MatchReason = 'spoiler_word' | 'description_phrase' | 'keyword_with_verb';
+
 export interface MatchResult {
-  keyword: string;
-  contextPattern: string;
+  reason: MatchReason;
+  /** パターン3: マッチしたゲームキーワード */
+  keyword?: string;
+  /** パターン3: マッチしたネタバレ動詞 */
+  verb?: string;
+  /** パターン2: マッチした固有フレーズ */
+  phrase?: string;
 }
 
 /**
- * キーワード AND ネタバレ文脈表現の両方がテキストに含まれる場合のみフィルタ対象とする。
- * どちらか片方のみのヒットはスルー（誤検出削減）。
- * @returns 両方マッチした場合は { keyword, contextPattern }、それ以外は null
+ * Stage 1 フィルタ判定。3パターンのいずれかにマッチした場合にフィルタ対象とする。
+ *
+ * @param text       コメント本文
+ * @param keywords   buildKeywordSet() が返すゲームキーワードセット
+ * @param descriptionPhrases buildDescriptionPhraseSet() が返す固有フレーズセット
+ * @returns マッチした場合は MatchResult、マッチなしの場合は null
  */
-export function matchesKeyword(text: string, keywords: Set<string>): MatchResult | null {
-  const contextPattern = matchesSpoilerContext(text);
-  if (contextPattern === null) return null;
-
+export function matchesKeyword(
+  text: string,
+  keywords: Set<string>,
+  descriptionPhrases: Set<string>,
+): MatchResult | null {
   const lower = text.toLowerCase();
-  for (const kw of keywords) {
-    if (lower.includes(kw.toLowerCase())) {
-      return { keyword: kw, contextPattern };
+
+  // パターン1: 「ネタバレ」という単語そのものを含む
+  if (lower.includes('ネタバレ')) {
+    return { reason: 'spoiler_word' };
+  }
+
+  // パターン2: 知識ベース description の固有フレーズに直接マッチ
+  for (const phrase of descriptionPhrases) {
+    if (lower.includes(phrase.toLowerCase())) {
+      return { reason: 'description_phrase', phrase };
     }
   }
+
+  // パターン3: ゲームキーワード + 明確なネタバレ動詞の組み合わせ
+  const verb = matchesSpoilerVerb(text);
+  if (verb !== null) {
+    for (const kw of keywords) {
+      if (lower.includes(kw.toLowerCase())) {
+        return { reason: 'keyword_with_verb', keyword: kw, verb };
+      }
+    }
+  }
+
   return null;
 }

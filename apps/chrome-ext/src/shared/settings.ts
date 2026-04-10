@@ -22,8 +22,6 @@ export interface Settings {
   progressByGame: Record<string, GameProgress>;
   filterMode: FilterMode;
   displayMode: DisplayMode;
-  /** フィルタされたコメント数（セッション累計） */
-  filterCount: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -32,10 +30,16 @@ export const DEFAULT_SETTINGS: Settings = {
   progressByGame: {},
   filterMode: 'standard',
   displayMode: 'placeholder',
-  filterCount: 0,
 };
 
+/** メイン設定のストレージキー。書き込みはポップアップのみ行う。 */
 export const STORAGE_KEY = 'spoilershield_settings';
+
+/**
+ * フィルタカウントの専用ストレージキー。
+ * Content Script のみ書き込む。STORAGE_KEY との競合を防ぐために分離している。
+ */
+export const FILTER_COUNT_KEY = 'spoilershield_filter_count';
 
 /**
  * フィルタモードに応じてブロック対象の spoiler_level 一覧を返す
@@ -63,11 +67,6 @@ export async function loadSettings(): Promise<Settings> {
 
 /** chrome.storage.local に設定を保存する */
 export async function saveSettings(settings: Settings): Promise<void> {
+  console.log('[SpoilerShield][storage.set]', { caller: 'content/shortcut', enabled: settings.enabled });
   await chrome.storage.local.set({ [STORAGE_KEY]: settings });
-}
-
-/** フィルタカウントを1増やす */
-export async function incrementFilterCount(): Promise<void> {
-  const current = await loadSettings();
-  await saveSettings({ ...current, filterCount: current.filterCount + 1 });
 }

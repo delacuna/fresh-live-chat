@@ -125,7 +125,9 @@ build: {
 - 複数の Vite config を組み合わせる場合は `emptyOutDir` の適用タイミングに注意する
 - 1つの config で複数エントリを `iife` ビルドすることは Rollup の制約上できないため、Content Script と Service Worker は config ファイルを分けて管理する
 
---- LLMが固有名詞（キャラクター名）を創作する
+---
+
+## #004 LLMが固有名詞（キャラクター名）を創作する
 
 **日付:** 2026-04-08
 

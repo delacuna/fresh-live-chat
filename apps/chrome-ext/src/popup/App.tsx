@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   DEFAULT_SETTINGS,
   STORAGE_KEY,
+  FILTER_COUNT_KEY,
   type FilterMode,
   type DisplayMode,
   type GameProgress,
@@ -133,22 +134,23 @@ function ProgressSettings({
 
 export default function App() {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [filterCount, setFilterCount] = useState(0);
   const [loaded, setLoaded] = useState(false);
 
-  // 起動時に設定を読み込む
+  // 起動時に設定とフィルタカウントをそれぞれのキーから読み込む
   useEffect(() => {
-    chrome.storage.local.get(STORAGE_KEY, (result) => {
+    chrome.storage.local.get([STORAGE_KEY, FILTER_COUNT_KEY], (result) => {
       setSettings({ ...DEFAULT_SETTINGS, ...(result[STORAGE_KEY] as Partial<Settings>) });
+      setFilterCount((result[FILTER_COUNT_KEY] as number | undefined) ?? 0);
       setLoaded(true);
     });
   }, []);
 
-  // ポップアップが開いている間もカウントの変化を反映する
+  // ポップアップが開いている間も FILTER_COUNT_KEY の変化を反映する
   useEffect(() => {
     const listener = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
-      if (area === 'local' && changes[STORAGE_KEY]) {
-        const next = changes[STORAGE_KEY].newValue as Settings;
-        setSettings((prev) => ({ ...prev, filterCount: next.filterCount }));
+      if (area === 'local' && changes[FILTER_COUNT_KEY]) {
+        setFilterCount((changes[FILTER_COUNT_KEY].newValue as number | undefined) ?? 0);
       }
     };
     chrome.storage.onChanged.addListener(listener);
@@ -158,6 +160,7 @@ export default function App() {
   const update = (partial: Partial<Settings>) => {
     const next = { ...settings, ...partial };
     setSettings(next);
+    console.log('[SpoilerShield][storage.set]', { caller: 'popup', keys: Object.keys(partial), partial });
     chrome.storage.local.set({ [STORAGE_KEY]: next });
   };
 
@@ -177,8 +180,8 @@ export default function App() {
         <div>
           <div className="font-semibold text-base leading-tight">🛡 SpoilerShield</div>
           <div className="text-xs text-indigo-200 mt-0.5">
-            {settings.filterCount > 0
-              ? `${settings.filterCount}件のコメントをフィルタしました`
+            {filterCount > 0
+              ? `${filterCount}件のコメントをフィルタしました`
               : 'フィルタ待機中'}
           </div>
         </div>

@@ -22,6 +22,7 @@ export function filterMessageElement(
   displayMode: DisplayMode,
   matchedKeyword?: string,
   matchedContext?: string,
+  onReveal?: () => void,
 ): void {
   if (el.getAttribute(ATTR_FILTERED) === 'true') return;
 
@@ -52,23 +53,92 @@ export function filterMessageElement(
     el.textContent = PLACEHOLDER;
     (el as HTMLElement).style.cursor = 'pointer';
     (el as HTMLElement).style.opacity = '0.55';
-    el.addEventListener('click', handleRevealClick, { once: true });
+    el.addEventListener('click', (e: Event) => {
+      handleRevealClick(e);
+      onReveal?.();
+    }, { once: true });
   }
 }
 
 /**
  * クリックで元のテキストを復元する（placeholder モード用）。
+ * ATTR_FILTERED は保持したまま ATTR_REVEALED を付与し、
+ * 同一要素への再フィルタを防ぐ。
  */
 function handleRevealClick(e: Event): void {
   const el = e.currentTarget as Element;
-  restoreMessageElement(el);
+  const original = el.getAttribute(ATTR_ORIGINAL);
+  if (original === null) return;
+
+  el.textContent = original;
+  el.removeAttribute(ATTR_ORIGINAL);
+  el.setAttribute(ATTR_FILTERED, 'revealed'); // 'true' から変更して再フィルタをブロック
+  (el as HTMLElement).style.cursor = '';
+  (el as HTMLElement).style.opacity = '';
+}
+
+/**
+ * フィルタ済み要素の表示方式を、復元→再フィルタなしで直接切り替える。
+ * フラッシュを防ぐため、ユーザーに元テキストが見える瞬間を作らない。
+ *
+ * placeholder → hidden:
+ *   ATTR_ORIGINAL に退避済みのオリジナルテキストを使って行を非表示にする。
+ *   テキストをプレースホルダーから元に戻しつつ、行ごと display:none にする。
+ *
+ * hidden → placeholder:
+ *   display:none を解除し、テキストをプレースホルダーに書き換える。
+ */
+export function switchDisplayMode(el: Element, nextMode: DisplayMode, onReveal?: () => void): void {
+  if (el.getAttribute(ATTR_FILTERED) !== 'true') return;
+
+  if (nextMode === 'hidden') {
+    // placeholder → hidden
+    const original = el.getAttribute(ATTR_ORIGINAL);
+    if (original !== null) {
+      // テキストを元に戻してから行を非表示にする（プレースホルダーテキストは行と一緒に隠す）
+      el.textContent = original;
+      el.removeAttribute(ATTR_ORIGINAL);
+      (el as HTMLElement).style.cursor = '';
+      (el as HTMLElement).style.opacity = '';
+    }
+    const row =
+      el.closest('yt-live-chat-text-message-renderer') ??
+      el.closest('yt-live-chat-paid-message-renderer') ??
+      el.parentElement;
+    if (row) {
+      row.setAttribute(ATTR_HIDDEN_ROW, 'true');
+      (row as HTMLElement).style.display = 'none';
+    }
+  } else {
+    // hidden → placeholder
+    // hidden モードでは ATTR_ORIGINAL がないため、現在の textContent がオリジナル
+    const originalText = el.textContent ?? '';
+
+    // 先にテキストをプレースホルダーに書き換えてから行を表示する。
+    // 行を表示した瞬間にオリジナルテキストが見えることを防ぐ。
+    el.setAttribute(ATTR_ORIGINAL, originalText);
+    el.textContent = PLACEHOLDER;
+    (el as HTMLElement).style.cursor = 'pointer';
+    (el as HTMLElement).style.opacity = '0.55';
+    el.addEventListener('click', (e: Event) => {
+      handleRevealClick(e);
+      onReveal?.();
+    }, { once: true });
+
+    const hiddenRow = el.closest(`[${ATTR_HIDDEN_ROW}]`);
+    if (hiddenRow) {
+      hiddenRow.removeAttribute(ATTR_HIDDEN_ROW);
+      (hiddenRow as HTMLElement).style.display = '';
+    }
+  }
 }
 
 /**
  * フィルタ済み要素を元に戻す（設定変更時や手動復元に使用）。
  */
 export function restoreMessageElement(el: Element): void {
-  if (el.getAttribute(ATTR_FILTERED) !== 'true') return;
+  const filteredAttr = el.getAttribute(ATTR_FILTERED);
+  if (filteredAttr !== 'true' && filteredAttr !== 'revealed') return;
 
   // hidden モード: 行コンテナの表示を戻す
   const hiddenRow = el.closest(`[${ATTR_HIDDEN_ROW}]`);
