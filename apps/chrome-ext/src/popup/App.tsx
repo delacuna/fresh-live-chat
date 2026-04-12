@@ -3,10 +3,13 @@ import {
   DEFAULT_SETTINGS,
   STORAGE_KEY,
   FILTER_COUNT_KEY,
+  STAGE2_USAGE_KEY,
+  STAGE2_MONTHLY_LIMIT,
   type FilterMode,
   type DisplayMode,
   type GameProgress,
   type Settings,
+  type Stage2Usage,
 } from '../shared/settings.js';
 import type { KBGame } from '@spoilershield/knowledge-base';
 import aceAttorney1 from '@kb-data/ace-attorney-1.json';
@@ -135,22 +138,32 @@ function ProgressSettings({
 export default function App() {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [filterCount, setFilterCount] = useState(0);
+  const [stage2Count, setStage2Count] = useState(0);
   const [loaded, setLoaded] = useState(false);
 
-  // 起動時に設定とフィルタカウントをそれぞれのキーから読み込む
+  // 起動時に設定・フィルタカウント・Stage 2 利用量を読み込む
   useEffect(() => {
-    chrome.storage.local.get([STORAGE_KEY, FILTER_COUNT_KEY], (result) => {
+    chrome.storage.local.get([STORAGE_KEY, FILTER_COUNT_KEY, STAGE2_USAGE_KEY], (result) => {
       setSettings({ ...DEFAULT_SETTINGS, ...(result[STORAGE_KEY] as Partial<Settings>) });
       setFilterCount((result[FILTER_COUNT_KEY] as number | undefined) ?? 0);
+      const usage = result[STAGE2_USAGE_KEY] as Stage2Usage | undefined;
+      const currentMonth = new Date().toISOString().slice(0, 7);
+      setStage2Count(usage?.month === currentMonth ? (usage.messageCount ?? 0) : 0);
       setLoaded(true);
     });
   }, []);
 
-  // ポップアップが開いている間も FILTER_COUNT_KEY の変化を反映する
+  // ポップアップが開いている間も変化を反映する
   useEffect(() => {
     const listener = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
-      if (area === 'local' && changes[FILTER_COUNT_KEY]) {
+      if (area !== 'local') return;
+      if (changes[FILTER_COUNT_KEY]) {
         setFilterCount((changes[FILTER_COUNT_KEY].newValue as number | undefined) ?? 0);
+      }
+      if (changes[STAGE2_USAGE_KEY]) {
+        const usage = changes[STAGE2_USAGE_KEY].newValue as Stage2Usage | undefined;
+        const currentMonth = new Date().toISOString().slice(0, 7);
+        setStage2Count(usage?.month === currentMonth ? (usage.messageCount ?? 0) : 0);
       }
     };
     chrome.storage.onChanged.addListener(listener);
@@ -182,6 +195,10 @@ export default function App() {
             {filterCount > 0
               ? `${filterCount}件のコメントをフィルタしました`
               : 'フィルタ待機中'}
+          </div>
+          <div className={`text-xs mt-0.5 ${stage2Count >= STAGE2_MONTHLY_LIMIT ? 'text-red-300' : 'text-indigo-300'}`}>
+            今月のAPI使用: {stage2Count} / {STAGE2_MONTHLY_LIMIT}回
+            {stage2Count >= STAGE2_MONTHLY_LIMIT && ' (上限到達)'}
           </div>
         </div>
         <div className="flex flex-col items-center gap-0.5">

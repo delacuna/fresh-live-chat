@@ -50,6 +50,65 @@ export const ANON_TOKEN_KEY = 'spoilershield_anon_token';
  */
 export const FILTER_COUNT_KEY = 'spoilershield_filter_count';
 
+/** Stage 2 月間利用量のストレージキー */
+export const STAGE2_USAGE_KEY = 'spoilershield_stage2_usage';
+
+/**
+ * Stage 2 の月間メッセージ件数上限。超えた場合は Stage 1 のみで動作する。
+ * メッセージ件数で判定する（HTTP リクエスト回数ではない）。
+ */
+export const STAGE2_MONTHLY_LIMIT = 1000;
+
+export interface Stage2Usage {
+  /** 集計月（"YYYY-MM" 形式）。月をまたいだらリセット判定に使用する。 */
+  month: string;
+  /**
+   * 今月 Stage 2 に送信したメッセージの総件数。
+   * ポップアップ表示と月間上限チェックに使用する。
+   */
+  messageCount: number;
+  /**
+   * 今月プロキシに送信した HTTP リクエスト回数（バッチ単位）。
+   * 内部記録のみ。ポップアップには表示しない。
+   */
+  apiCallCount: number;
+}
+
+function getCurrentMonth(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/** chrome.storage から今月の Stage 2 利用量を取得する。月が変わっていればリセット済みの値を返す。 */
+export async function getStage2Usage(): Promise<Stage2Usage> {
+  const result = await chrome.storage.local.get(STAGE2_USAGE_KEY);
+  const stored = result[STAGE2_USAGE_KEY] as Stage2Usage | undefined;
+  const currentMonth = getCurrentMonth();
+  if (!stored || stored.month !== currentMonth) {
+    return { month: currentMonth, messageCount: 0, apiCallCount: 0 };
+  }
+  return {
+    month: stored.month,
+    messageCount: stored.messageCount ?? 0,
+    apiCallCount: stored.apiCallCount ?? 0,
+  };
+}
+
+/**
+ * Stage 2 バッチ送信成功時に利用量を更新する。
+ * @param messages バッチに含まれていたメッセージ件数
+ */
+export async function incrementStage2Usage(messages: number): Promise<Stage2Usage> {
+  const usage = await getStage2Usage();
+  const updated: Stage2Usage = {
+    month: usage.month,
+    messageCount: usage.messageCount + messages,
+    apiCallCount: usage.apiCallCount + 1,
+  };
+  await chrome.storage.local.set({ [STAGE2_USAGE_KEY]: updated });
+  return updated;
+}
+
 /**
  * フィルタモードに応じてブロック対象の spoiler_level 一覧を返す
  *

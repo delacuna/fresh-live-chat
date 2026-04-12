@@ -113,12 +113,16 @@ export function buildStage2CacheKey(
  *   （Stage 1 を通過した候補なので、フィルタしない方が安全）
  * - LLM 判定失敗時の verdict は verdictFromCache が filterMode に応じて決定する
  */
+/**
+ * @returns プロキシへの HTTP リクエストが成功した場合 true、失敗した場合 false。
+ *          呼び出し元はこの戻り値に応じて利用量カウントをインクリメントする。
+ */
 export async function sendStage2Batch(
   batch: Stage2Candidate[],
   settings: Settings,
   token: string,
   onResult: OnStage2Result,
-): Promise<void> {
+): Promise<boolean> {
   const progress = settings.progressByGame[settings.gameId];
 
   const body = {
@@ -140,7 +144,7 @@ export async function sendStage2Batch(
 
     if (!res.ok) {
       console.error(`[SpoilerShield] Stage 2エラー: HTTP ${res.status}`);
-      return;
+      return false;
     }
 
     const data = await res.json() as {
@@ -167,8 +171,11 @@ export async function sendStage2Batch(
       await saveJudgeCacheEntry(candidate.cacheKey, entry);
       onResult(candidate, entry);
     }
+
+    return true;
   } catch (err) {
     console.error(`[SpoilerShield] Stage 2エラー: ${err instanceof Error ? err.message : String(err)}`);
+    return false;
   }
 }
 

@@ -18,6 +18,9 @@ import {
   STORAGE_KEY,
   FILTER_COUNT_KEY,
   getOrCreateAnonToken,
+  getStage2Usage,
+  incrementStage2Usage,
+  STAGE2_MONTHLY_LIMIT,
   type Settings,
 } from '../shared/settings.js';
 import {
@@ -325,9 +328,18 @@ async function drainStage2Queue(): Promise<void> {
       // enabled が途中でオフになったら中断
       if (!currentSettings?.enabled) break;
 
+      // 月間上限チェック: 上限に達していたら Stage 2 を停止し Stage 1 のみで継続
+      const usage = await getStage2Usage();
+      if (usage.messageCount >= STAGE2_MONTHLY_LIMIT) {
+        console.log(`[SpoilerShield] Stage 2月間上限(${STAGE2_MONTHLY_LIMIT}回)に達しました。Stage 1のみで動作を継続します。`);
+        stage2Queue = [];
+        break;
+      }
+
       const batch = stage2Queue.splice(0, 5);
       console.log(`[SpoilerShield] Stage 2送信: ${batch.length}件`);
-      await sendStage2Batch(batch, currentSettings, anonToken, applyStage2Verdict);
+      const success = await sendStage2Batch(batch, currentSettings, anonToken, applyStage2Verdict);
+      if (success) await incrementStage2Usage(batch.length);
 
       if (stage2Queue.length > 0) {
         await sleep(1000);
