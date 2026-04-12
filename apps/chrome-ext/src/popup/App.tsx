@@ -191,13 +191,11 @@ export default function App() {
       <div className="flex items-center justify-between px-4 py-3 bg-indigo-600 text-white">
         <div>
           <div className="font-semibold text-base leading-tight">🛡 SpoilerShield</div>
-          <div className="text-xs text-indigo-200 mt-0.5">
-            {filterCount > 0
-              ? `${filterCount}件のコメントをフィルタしました`
-              : 'フィルタ待機中'}
+          <div className="text-xs text-indigo-200 mt-1">
+            🛡 {filterCount}件のコメントをフィルタしました
           </div>
           <div className={`text-xs mt-0.5 ${stage2Count >= STAGE2_MONTHLY_LIMIT ? 'text-red-300' : 'text-indigo-300'}`}>
-            今月のAPI使用: {stage2Count} / {STAGE2_MONTHLY_LIMIT}回
+            今月のフィルタ判定件数: {stage2Count} / {STAGE2_MONTHLY_LIMIT}件
             {stage2Count >= STAGE2_MONTHLY_LIMIT && ' (上限到達)'}
           </div>
         </div>

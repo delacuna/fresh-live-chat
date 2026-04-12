@@ -88,6 +88,9 @@ let anonToken = '';
 export function startArchiveMode(): void {
   console.log('[SpoilerShield] アーカイブモードで起動しました');
 
+  // 動画単位のフィルタカウンターをリセット（リロード・別動画への移動時）
+  chrome.storage.local.set({ [FILTER_COUNT_KEY]: 0 });
+
   // Stage 2 キャッシュの読み込みとトークン取得を並行して初期化
   Promise.all([initStage2Cache(), getOrCreateAnonToken()]).then(([, token]) => {
     anonToken = token;
