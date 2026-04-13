@@ -11,20 +11,26 @@
  * これは Stage 2（LLM）実装までの暫定措置。
  */
 
+import { normalizeKana } from "./normalizeKana.js";
+
 /** 明確なネタバレ動詞（事実として死亡・裏切りを断言する表現のみ） */
 export const SPOILER_VERBS: string[] = [
   '死ぬ', '死んだ', '死亡', '殺される', '殺した', '殺す',
   '裏切る', '裏切り', '裏切った',
 ];
 
+/** 正規化済み動詞リスト（マッチング用） */
+const NORMALIZED_VERBS = SPOILER_VERBS.map(normalizeKana);
+
 /**
  * テキスト中に明確なネタバレ動詞が含まれるか判定する。
- * @returns マッチした動詞、なければ null
+ * ひらがな・カタカナ・半角カナの表記ゆれを吸収して比較する。
+ * @returns マッチした動詞（元の表記）、なければ null
  */
 export function matchesSpoilerVerb(text: string): string | null {
-  const lower = text.toLowerCase();
-  for (const verb of SPOILER_VERBS) {
-    if (lower.includes(verb)) return verb;
+  const normalized = normalizeKana(text);
+  for (let i = 0; i < NORMALIZED_VERBS.length; i++) {
+    if (normalized.includes(NORMALIZED_VERBS[i])) return SPOILER_VERBS[i];
   }
   return null;
 }

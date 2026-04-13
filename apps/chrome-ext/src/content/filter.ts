@@ -17,7 +17,7 @@
 import type { KBGame } from '@spoilershield/knowledge-base';
 import aceAttorney1 from '@kb-data/ace-attorney-1.json';
 import { getBlockedLevels, type FilterMode, type GameProgress, type CustomNGWord } from '../shared/settings.js';
-import { matchesSpoilerVerb } from '@spoilershield/shared';
+import { matchesSpoilerVerb, normalizeKana } from '@spoilershield/shared';
 
 const ALL_GAMES: KBGame[] = [aceAttorney1 as unknown as KBGame];
 
@@ -123,16 +123,16 @@ export function matchesKeyword(
   keywords: Set<string>,
   descriptionPhrases: Set<string>,
 ): MatchResult | null {
-  const lower = text.toLowerCase();
+  const normalized = normalizeKana(text);
 
-  // パターン1: 「ネタバレ」という単語そのものを含む
-  if (lower.includes('ネタバレ')) {
+  // パターン1: 「ネタバレ」という単語そのものを含む（カナ統一後に比較）
+  if (normalized.includes('ネタバレ')) {
     return { reason: 'spoiler_word' };
   }
 
   // パターン2: 知識ベース description の固有フレーズに直接マッチ
   for (const phrase of descriptionPhrases) {
-    if (lower.includes(phrase.toLowerCase())) {
+    if (normalized.includes(normalizeKana(phrase))) {
       return { reason: 'description_phrase', phrase };
     }
   }
@@ -141,7 +141,7 @@ export function matchesKeyword(
   const verb = matchesSpoilerVerb(text);
   if (verb !== null) {
     for (const kw of keywords) {
-      if (lower.includes(kw.toLowerCase())) {
+      if (normalized.includes(normalizeKana(kw))) {
         return { reason: 'keyword_with_verb', keyword: kw, verb };
       }
     }
@@ -158,10 +158,10 @@ export function matchesKeyword(
  */
 export function matchesCustomNGWord(text: string, words: CustomNGWord[]): string | null {
   if (words.length === 0) return null;
-  const lower = text.toLowerCase();
+  const normalized = normalizeKana(text);
   for (const entry of words) {
     if (!entry.enabled) continue;
-    if (lower.includes(entry.word.toLowerCase())) return entry.word;
+    if (normalized.includes(normalizeKana(entry.word))) return entry.word;
   }
   return null;
 }
@@ -177,9 +177,9 @@ export function matchesCustomNGWord(text: string, words: CustomNGWord[]): string
  * @returns マッチしたキーワード、またはマッチなしの場合は null
  */
 export function matchesKeywordForStage2(text: string, keywords: Set<string>): string | null {
-  const lower = text.toLowerCase();
+  const normalized = normalizeKana(text);
   for (const kw of keywords) {
-    if (lower.includes(kw.toLowerCase())) {
+    if (normalized.includes(normalizeKana(kw))) {
       return kw;
     }
   }
