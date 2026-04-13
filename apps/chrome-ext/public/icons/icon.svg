@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Shield shape -->
+  <path
+    d="M64 8 L112 28 L112 68 C112 96 88 116 64 124 C40 116 16 96 16 68 L16 28 Z"
+    fill="#3B82F6"
+  />
+  <!-- Shield inner highlight (lighter top-left area) -->
+  <path
+    d="M64 16 L104 33 L104 68 C104 91 84 109 64 117 C44 109 24 91 24 68 L24 33 Z"
+    fill="#60A5FA"
+    opacity="0.35"
+  />
+
+  <!-- Eye outline (ellipse) -->
+  <ellipse cx="64" cy="66" rx="26" ry="16" fill="none" stroke="white" stroke-width="5" stroke-linecap="round"/>
+  <!-- Pupil -->
+  <circle cx="64" cy="66" r="8" fill="white"/>
+  <!-- Inner pupil -->
+  <circle cx="64" cy="66" r="4" fill="#3B82F6"/>
+
+  <!-- Diagonal strike-through line (top-left to bottom-right) -->
+  <line x1="38" y1="44" x2="90" y2="88"
+    stroke="white" stroke-width="5.5" stroke-linecap="round"/>
+  <!-- Shadow line behind for contrast -->
+  <line x1="38" y1="44" x2="90" y2="88"
+    stroke="#1D4ED8" stroke-width="9" stroke-linecap="round" opacity="0.3"/>
+  <!-- Redraw white line on top -->
+  <line x1="38" y1="44" x2="90" y2="88"
+    stroke="white" stroke-width="5.5" stroke-linecap="round"/>
+</svg>
