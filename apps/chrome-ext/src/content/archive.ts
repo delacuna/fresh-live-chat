@@ -11,7 +11,7 @@
  * - Stage 2: プロキシ経由 LLM 判定（非同期、判定中は通常表示を維持）
  */
 
-import { buildKeywordSet, buildDescriptionPhraseSet, matchesKeyword, matchesKeywordForStage2 } from './filter.js';
+import { buildKeywordSet, buildDescriptionPhraseSet, matchesKeyword, matchesKeywordForStage2, matchesCustomNGWord } from './filter.js';
 import { filterMessageElement, restoreMessageElement, switchDisplayMode, ATTR_FALSE_POSITIVE } from './chat-dom.js';
 import {
   loadSettings,
@@ -113,7 +113,8 @@ export function startArchiveMode(): void {
         prev?.enabled === next.enabled &&
         prev?.gameId === next.gameId &&
         prev?.filterMode === next.filterMode &&
-        JSON.stringify(prev?.progressByGame) === JSON.stringify(next.progressByGame);
+        JSON.stringify(prev?.progressByGame) === JSON.stringify(next.progressByGame) &&
+        JSON.stringify(prev?.customNgWords) === JSON.stringify(next.customNgWords);
 
       currentSettings = next;
       currentKeywords = buildKeywordsFromSettings(next);
@@ -276,6 +277,15 @@ function processMessage(el: Element): void {
   if (!text) return;
 
   if (revealedTexts.has(text)) return;
+
+  // ── カスタムNGワード: 即時判定（ゲーム知識ベースと独立） ───────────────────────
+  const customNgWords = currentSettings.customNgWords ?? [];
+  const matchedNgWord = matchesCustomNGWord(text, customNgWords);
+  if (matchedNgWord !== null) {
+    console.log(`[SpoilerShield] カスタムNGワード: "${text.slice(0, 20)}" → フィルタ (${matchedNgWord})`);
+    applyFilter(el, text, matchedNgWord);
+    return;
+  }
 
   // ── Stage 1: 即時判定 ──────────────────────────────────────────────────────
   const matchResult = matchesKeyword(text, currentKeywords, currentDescriptionPhrases);

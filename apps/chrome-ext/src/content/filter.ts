@@ -16,7 +16,7 @@
 
 import type { KBGame } from '@spoilershield/knowledge-base';
 import aceAttorney1 from '@kb-data/ace-attorney-1.json';
-import { getBlockedLevels, type FilterMode, type GameProgress } from '../shared/settings.js';
+import { getBlockedLevels, type FilterMode, type GameProgress, type CustomNGWord } from '../shared/settings.js';
 import { matchesSpoilerVerb } from '@spoilershield/shared';
 
 const ALL_GAMES: KBGame[] = [aceAttorney1 as unknown as KBGame];
@@ -147,6 +147,22 @@ export function matchesKeyword(
     }
   }
 
+  return null;
+}
+
+/**
+ * カスタム NG ワードによる即時判定。
+ * enabled なワードに部分一致した場合にそのワードを返す。
+ *
+ * @returns マッチしたワード、またはマッチなしの場合は null
+ */
+export function matchesCustomNGWord(text: string, words: CustomNGWord[]): string | null {
+  if (words.length === 0) return null;
+  const lower = text.toLowerCase();
+  for (const entry of words) {
+    if (!entry.enabled) continue;
+    if (lower.includes(entry.word.toLowerCase())) return entry.word;
+  }
   return null;
 }
 

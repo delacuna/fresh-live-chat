@@ -8,6 +8,15 @@ import type { MisreportEntry } from '@spoilershield/shared';
 export type FilterMode = 'strict' | 'standard' | 'lenient';
 export type DisplayMode = 'placeholder' | 'hidden';
 
+export interface CustomNGWord {
+  /** 安定した識別子（UUID） */
+  id: string;
+  /** フィルタ対象のワード */
+  word: string;
+  /** false のとき非アクティブ（フィルタ対象外） */
+  enabled: boolean;
+}
+
 export interface GameProgress {
   progressModel: 'chapter' | 'event';
   /** チャプターモデル: 現在プレイ中のチャプターID */
@@ -26,6 +35,8 @@ export interface Settings {
   displayMode: DisplayMode;
   /** Stage 2 プロキシの URL（デフォルト: http://localhost:8787） */
   proxyUrl: string;
+  /** ユーザー定義のカスタム NG ワード一覧 */
+  customNgWords: CustomNGWord[];
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -35,6 +46,7 @@ export const DEFAULT_SETTINGS: Settings = {
   filterMode: 'standard',
   displayMode: 'placeholder',
   proxyUrl: 'http://localhost:8787',
+  customNgWords: [],
 };
 
 /** メイン設定のストレージキー。書き込みはポップアップのみ行う。 */

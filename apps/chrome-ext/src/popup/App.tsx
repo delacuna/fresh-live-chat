@@ -10,6 +10,7 @@ import {
   type GameProgress,
   type Settings,
   type Stage2Usage,
+  type CustomNGWord,
 } from '../shared/settings.js';
 import type { KBGame } from '@spoilershield/knowledge-base';
 import aceAttorney1 from '@kb-data/ace-attorney-1.json';
@@ -72,6 +73,93 @@ function SegmentedControl({
           {opt.label}
         </button>
       ))}
+    </div>
+  );
+}
+
+// ─── カスタムNGワードセクション ────────────────────────────────────────
+
+const CUSTOM_NG_WORD_LIMIT = 200;
+
+function CustomNGWordSection({
+  words,
+  onChange,
+}: {
+  words: CustomNGWord[];
+  onChange: (words: CustomNGWord[]) => void;
+}) {
+  const [input, setInput] = useState('');
+  const atLimit = words.length >= CUSTOM_NG_WORD_LIMIT;
+
+  const addWord = () => {
+    const trimmed = input.trim();
+    if (!trimmed || atLimit) return;
+    if (words.some((w) => w.word === trimmed)) return;
+    onChange([...words, { id: crypto.randomUUID(), word: trimmed, enabled: true }]);
+    setInput('');
+  };
+
+  const removeWord = (id: string) => onChange(words.filter((w) => w.id !== id));
+
+  const toggleWord = (id: string) =>
+    onChange(words.map((w) => (w.id === id ? { ...w, enabled: !w.enabled } : w)));
+
+  return (
+    <div>
+      <div className="flex gap-1.5 mb-2">
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && addWord()}
+          placeholder="フィルタするワードを入力"
+          disabled={atLimit}
+          className="flex-1 border border-gray-200 rounded px-2 py-1.5 text-sm bg-white min-w-0 disabled:bg-gray-50 disabled:text-gray-400"
+        />
+        <button
+          onClick={addWord}
+          disabled={!input.trim() || atLimit}
+          className="px-2.5 py-1.5 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+        >
+          追加
+        </button>
+      </div>
+      <div className={`text-xs mb-1.5 ${atLimit ? 'text-red-500 font-medium' : 'text-gray-400'}`}>
+        {atLimit
+          ? `上限に達しました（${words.length} / ${CUSTOM_NG_WORD_LIMIT}）`
+          : `登録済み: ${words.length} / ${CUSTOM_NG_WORD_LIMIT}`}
+      </div>
+      {words.length === 0 ? (
+        <p className="text-xs text-gray-400">登録済みのワードはありません</p>
+      ) : (
+        <ul className="space-y-1 max-h-36 overflow-y-auto">
+          {words.map((w) => (
+            <li
+              key={w.id}
+              className={`flex items-center gap-1.5 text-xs rounded px-2 py-1 bg-gray-50 ${!w.enabled ? 'opacity-40' : ''}`}
+            >
+              <span className="flex-1 truncate font-mono">{w.word}</span>
+              <button
+                onClick={() => toggleWord(w.id)}
+                className={`px-1.5 py-0.5 rounded text-xs font-medium border transition-colors ${
+                  w.enabled
+                    ? 'border-indigo-300 text-indigo-600 bg-indigo-50 hover:bg-indigo-100'
+                    : 'border-gray-300 text-gray-400 bg-white hover:bg-gray-100'
+                }`}
+              >
+                {w.enabled ? 'ON' : 'OFF'}
+              </button>
+              <button
+                onClick={() => removeWord(w.id)}
+                className="text-gray-400 hover:text-red-500 transition-colors px-1 leading-none"
+                aria-label="削除"
+              >
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
@@ -232,6 +320,14 @@ export default function App() {
                 progressByGame: { ...settings.progressByGame, [settings.gameId]: p },
               })
             }
+          />
+        </Section>
+
+        {/* カスタムNGワード */}
+        <Section label="カスタムNGワード">
+          <CustomNGWordSection
+            words={settings.customNgWords ?? []}
+            onChange={(words) => update({ customNgWords: words })}
           />
         </Section>
 
