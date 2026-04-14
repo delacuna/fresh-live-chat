@@ -17,6 +17,23 @@ import aceAttorney1 from '@kb-data/ace-attorney-1.json';
 
 const GAMES: KBGame[] = [aceAttorney1 as unknown as KBGame];
 
+// ─── アイコン ──────────────────────────────────────────────────────────
+
+function ShieldIcon({ size = 20 }: { size?: number }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width={size} height={size} style={{ flexShrink: 0 }}>
+      <path d="M64 8 L112 28 L112 68 C112 96 88 116 64 124 C40 116 16 96 16 68 L16 28 Z" fill="#3B82F6" />
+      <path d="M64 16 L104 33 L104 68 C104 91 84 109 64 117 C44 109 24 91 24 68 L24 33 Z" fill="#60A5FA" opacity="0.35" />
+      <ellipse cx="64" cy="66" rx="26" ry="16" fill="none" stroke="white" strokeWidth="5" strokeLinecap="round" />
+      <circle cx="64" cy="66" r="8" fill="white" />
+      <circle cx="64" cy="66" r="4" fill="#3B82F6" />
+      <line x1="38" y1="44" x2="90" y2="88" stroke="white" strokeWidth="5.5" strokeLinecap="round" />
+      <line x1="38" y1="44" x2="90" y2="88" stroke="#1D4ED8" strokeWidth="9" strokeLinecap="round" opacity="0.3" />
+      <line x1="38" y1="44" x2="90" y2="88" stroke="white" strokeWidth="5.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 // ─── 小コンポーネント ─────────────────────────────────────────────────
 
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
@@ -278,9 +295,12 @@ export default function App() {
       {/* ヘッダー */}
       <div className="flex items-center justify-between px-4 py-3 bg-indigo-600 text-white">
         <div>
-          <div className="font-semibold text-base leading-tight">🛡 SpoilerShield</div>
+          <div className="flex items-center gap-2 font-semibold text-base leading-tight">
+            <ShieldIcon size={22} />
+            SpoilerShield
+          </div>
           <div className="text-xs text-indigo-200 mt-1">
-            🛡 {filterCount}件のコメントをフィルタしました
+            {filterCount}件のコメントをフィルタしました
           </div>
           <div className={`text-xs mt-0.5 ${stage2Count >= STAGE2_MONTHLY_LIMIT ? 'text-red-300' : 'text-indigo-300'}`}>
             今月のフィルタ判定件数: {stage2Count} / {STAGE2_MONTHLY_LIMIT}件
