@@ -358,3 +358,40 @@ function shutdownOnInvalidContext(): void {
 - 開発中は気づきにくいが本番でも発生する（Chrome 自動更新時等）ため、公開前に対処が必要
 
 ---
+
+## #008 本番プロキシへのリクエストが Failed to fetch になる
+
+**日付:** 2026-04-14
+
+### 起きたこと
+
+- Cloudflare Workers に `wrangler deploy` でデプロイした本番プロキシ（`https://spoilershield-proxy.playnicelab.workers.dev`）に対して Chrome 拡張から fetch リクエストを送ると `Failed to fetch` エラーが発生した
+- ローカル（`http://localhost:8787`）では正常に動作していた
+- プロキシ側の CORS 設定（`Access-Control-Allow-Origin: *`、OPTIONS 対応）は正しく実装されていた
+
+### 原因
+
+`manifest.json` の `host_permissions` に本番プロキシの URL が含まれていなかった。
+
+Manifest V3 では、Content Script からの cross-origin fetch は **CORS とは独立して `host_permissions` でも許可が必要**。`host_permissions` に URL が含まれていない場合、CORS ヘッダーの有無に関わらずブラウザが拡張側でリクエストをブロックし、`Failed to fetch` になる。
+
+ローカルで動作していた理由は、`http://localhost:8787` も `host_permissions` に含まれていなかったが、ローカル開発時はセキュリティ制約が緩和されている環境で動作確認していたため表面化しなかった。
+
+### 解決策
+
+`manifest.json` の `host_permissions` に本番プロキシの URL を追加した。
+
+```json
+"host_permissions": [
+  "*://www.youtube.com/*",
+  "https://spoilershield-proxy.playnicelab.workers.dev/*"
+]
+```
+
+### 教訓
+
+- Manifest V3 の Content Script から外部 URL に fetch する場合は `host_permissions` への追加が必須。CORS ヘッダーだけでは不十分
+- 新しいエンドポイント（本番デプロイ・ドメイン変更等）を追加するたびに `host_permissions` の更新と拡張のリビルドが必要になる
+- ローカル開発環境では制約が異なる場合があるため、本番 URL への切り替え時は必ず動作確認する
+
+---

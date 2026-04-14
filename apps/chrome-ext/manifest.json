@@ -9,7 +9,10 @@
     "128": "icons/icon128.png"
   },
   "permissions": ["storage"],
-  "host_permissions": ["*://www.youtube.com/*"],
+  "host_permissions": [
+    "*://www.youtube.com/*",
+    "https://spoilershield-proxy.playnicelab.workers.dev/*"
+  ],
   "background": {
     "service_worker": "background.js"
   },
