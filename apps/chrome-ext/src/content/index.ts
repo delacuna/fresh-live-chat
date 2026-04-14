@@ -12,10 +12,10 @@ const mode = detectMode();
 
 switch (mode) {
   case 'archive':
-    startArchiveMode();
+    startArchiveMode('archive');
     break;
   case 'live':
-    // Phase 3 で実装予定
+    startArchiveMode('live');
     break;
   case 'none':
     // /watch 等のトップページでは何もしない

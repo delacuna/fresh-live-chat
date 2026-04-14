@@ -113,8 +113,8 @@ let anonToken = '';
 
 // ─── エントリポイント ─────────────────────────────────────────────────────────
 
-export function startArchiveMode(): void {
-  console.log('[SpoilerShield] アーカイブモードで起動しました');
+export function startArchiveMode(mode: 'archive' | 'live' = 'archive'): void {
+  console.log(`[SpoilerShield] ${mode === 'live' ? 'ライブモード' : 'アーカイブモード'}で起動しました`);
 
   // 動画単位のフィルタカウンターをリセット（リロード・別動画への移動時）
   chrome.storage.local.set({ [FILTER_COUNT_KEY]: 0 });
