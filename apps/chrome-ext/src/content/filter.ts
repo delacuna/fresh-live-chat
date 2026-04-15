@@ -210,6 +210,26 @@ export function matchesGenreTemplate(text: string, templates: GenreTemplate[]): 
 }
 
 /**
+ * ジャンルテンプレートの Stage 2 候補判定。
+ * Stage 1 でフィルタされなかったコメントのうち、ジャンルキーワードに部分マッチしたものを返す。
+ * gameId === 'other'（ゲームKBなし）の場合のみ使用する。
+ *
+ * @returns マッチしたキーワード、またはマッチなしは null
+ */
+export function matchesGenreKeywordForStage2(text: string, templates: GenreTemplate[]): string | null {
+  if (templates.length === 0) return null;
+  const normalized = normalizeKana(text);
+  for (const template of templates) {
+    for (const kw of template.keywords) {
+      if (normalized.includes(normalizeKana(kw))) {
+        return kw;
+      }
+    }
+  }
+  return null;
+}
+
+/**
  * Stage 2 候補判定。
  * Stage 1 でフィルタされなかったコメントのうち、ゲームキーワードに部分マッチしたものを返す。
  * Stage 1 はキーワード + ネタバレ動詞 の組み合わせが必要だが、ここではキーワード単体でヒットさせる。

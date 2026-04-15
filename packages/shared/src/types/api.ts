@@ -8,8 +8,16 @@ export interface JudgeRequest {
     id: string;
     text: string;
   }>;
-  gameId: string;
-  progress: UserProgress;
+  /** ゲームKB使用時に指定。ジャンルテンプレートのみの場合は省略可 */
+  gameId?: string | null;
+  /** ゲームKB使用時に指定。ジャンルテンプレートのみの場合は省略可 */
+  progress?: UserProgress | null;
+  /** フィルタモード */
+  filterMode?: string;
+  /** 有効化されているジャンルテンプレートのIDリスト */
+  selectedGenreTemplates?: string[];
+  /** YouTubeの動画タイトル（ゲーム自動推測に使用） */
+  videoTitle?: string;
 }
 
 /**

@@ -361,26 +361,37 @@ export default function App() {
             value={settings.gameId}
             onChange={(e) => update({ gameId: e.target.value })}
           >
-            {GAMES.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.title}
-              </option>
-            ))}
+            <option value="none">ゲームを選択しない</option>
+            <option value="other">その他のゲーム</option>
+            <optgroup label="─── 対応済みタイトル ───">
+              {GAMES.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.title}
+                </option>
+              ))}
+            </optgroup>
           </select>
+          {settings.gameId === 'other' && (
+            <p className="text-xs text-indigo-500 mt-1.5">
+              動画タイトルからゲームを自動推測します
+            </p>
+          )}
         </Section>
 
-        {/* 進行状況 */}
-        <Section label="進行状況">
-          <ProgressSettings
-            game={activeGame}
-            progress={activeProgress}
-            onChange={(p) =>
-              update({
-                progressByGame: { ...settings.progressByGame, [settings.gameId]: p },
-              })
-            }
-          />
-        </Section>
+        {/* 進行状況（ゲームKB選択時のみ表示） */}
+        {settings.gameId !== 'none' && settings.gameId !== 'other' && (
+          <Section label="進行状況">
+            <ProgressSettings
+              game={activeGame}
+              progress={activeProgress}
+              onChange={(p) =>
+                update({
+                  progressByGame: { ...settings.progressByGame, [settings.gameId]: p },
+                })
+              }
+            />
+          </Section>
+        )}
 
         {/* カスタムNGワード */}
         <Section label="カスタムNGワード">
@@ -392,6 +403,11 @@ export default function App() {
 
         {/* ジャンル別テンプレート */}
         <Section label="ジャンル別テンプレート">
+          {settings.gameId === 'other' && (settings.selectedGenreTemplates ?? []).length === 0 && (
+            <p className="text-xs text-indigo-500 mb-2">
+              ジャンルを選択するとフィルタ精度が上がります
+            </p>
+          )}
           <GenreTemplateSection
             selectedIds={settings.selectedGenreTemplates ?? []}
             onChange={(ids) => update({ selectedGenreTemplates: ids })}

@@ -6,4 +6,4 @@ dist/
 .env.local
 .wrangler/
 .dev.vars
-test-request.json
+test-request*.json

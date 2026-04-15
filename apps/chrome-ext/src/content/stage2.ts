@@ -122,15 +122,20 @@ export async function sendStage2Batch(
   settings: Settings,
   token: string,
   onResult: OnStage2Result,
+  videoTitle?: string,
 ): Promise<boolean> {
-  const progress = settings.progressByGame[settings.gameId];
+  // 'none'/'other' は KB なしの特殊値。プロキシには null で送りゲームID文字列として扱わせない
+  const isKBGame = settings.gameId !== 'none' && settings.gameId !== 'other';
+  const effectiveGameId = isKBGame ? settings.gameId : null;
+  const progress = isKBGame ? settings.progressByGame[settings.gameId] : undefined;
 
   const body = {
     messages: batch.map((c, i) => ({ id: String(i), text: c.text })),
-    gameId: settings.gameId,
-    progress: buildProxyProgress(settings.gameId, progress),
+    gameId: effectiveGameId,
+    progress: effectiveGameId ? buildProxyProgress(settings.gameId, progress) : null,
     filterMode: settings.filterMode,
     selectedGenreTemplates: settings.selectedGenreTemplates ?? [],
+    videoTitle: videoTitle || undefined,
   };
 
   try {

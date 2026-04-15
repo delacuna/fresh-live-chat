@@ -11,7 +11,7 @@
  * - Stage 2: プロキシ経由 LLM 判定（非同期、判定中は通常表示を維持）
  */
 
-import { buildKeywordSet, buildDescriptionPhraseSet, matchesKeyword, matchesKeywordForStage2, matchesCustomNGWord, buildActiveGenreTemplates, matchesGenreTemplate } from './filter.js';
+import { buildKeywordSet, buildDescriptionPhraseSet, matchesKeyword, matchesKeywordForStage2, matchesCustomNGWord, buildActiveGenreTemplates, matchesGenreTemplate, matchesGenreKeywordForStage2 } from './filter.js';
 import type { GenreTemplate } from '@spoilershield/knowledge-base';
 import { filterMessageElement, restoreMessageElement, switchDisplayMode, ATTR_FALSE_POSITIVE } from './chat-dom.js';
 import {
@@ -80,6 +80,9 @@ let currentSettings: Settings | null = null;
 let currentKeywords: Set<string> = new Set();
 let currentDescriptionPhrases: Set<string> = new Set();
 let currentGenreTemplates: GenreTemplate[] = [];
+
+/** YouTubeの動画タイトル（Stage 2のゲーム推測に使用） */
+let currentVideoTitle = '';
 let itemsContainerRef: Element | null = null;
 
 /** #items の childList を監視する Observer（pause/resume のために保持） */
@@ -117,6 +120,12 @@ let anonToken = '';
 
 export function startArchiveMode(mode: 'archive' | 'live' = 'archive'): void {
   console.log(`[SpoilerShield] ${mode === 'live' ? 'ライブモード' : 'アーカイブモード'}で起動しました`);
+
+  // 動画タイトルを取得（親フレームの document.title から "- YouTube" を除去）
+  currentVideoTitle = getVideoTitle();
+  if (currentVideoTitle) {
+    console.log(`[SpoilerShield] 動画タイトル取得: "${currentVideoTitle}"`);
+  }
 
   // 動画単位のフィルタカウンターをリセット（リロード・別動画への移動時）
   chrome.storage.local.set({ [FILTER_COUNT_KEY]: 0 });
@@ -341,7 +350,24 @@ function processMessage(el: Element): void {
 
   // ── Stage 2: キーワード単体マッチ → プロキシへ委託 ──────────────────────────
   const stage2keyword = matchesKeywordForStage2(text, currentKeywords);
-  if (!stage2keyword) return;
+  if (!stage2keyword) {
+    // ゲームKBがない場合（gameId === 'other'）はジャンルテンプレートキーワードで Stage 2 を試みる
+    if (currentSettings.gameId === 'other' && currentGenreTemplates.length > 0) {
+      const genreKeyword = matchesGenreKeywordForStage2(text, currentGenreTemplates);
+      if (genreKeyword) {
+        console.log(`[SpoilerShield] ジャンルStage2候補: ${text.slice(0, 20)} (keyword: ${genreKeyword})`);
+        const cacheKey = buildStage2CacheKey('other', undefined, text);
+        const cached = getCachedVerdict(cacheKey);
+        if (cached !== null) {
+          applyStage2Verdict({ text, el: new WeakRef(el), cacheKey, matchedKeyword: genreKeyword }, cached);
+          return;
+        }
+        stage2Queue.push({ text, el: new WeakRef(el), cacheKey, matchedKeyword: genreKeyword });
+        scheduleDrain();
+      }
+    }
+    return;
+  }
   console.log(`[SpoilerShield] Stage 1結果: ${text.slice(0, 20)} → Stage2候補 (keyword: ${stage2keyword})`);
 
   const progress = currentSettings.progressByGame[currentSettings.gameId];
@@ -406,7 +432,7 @@ async function drainStage2Queue(): Promise<void> {
 
       const batch = stage2Queue.splice(0, 5);
       console.log(`[SpoilerShield] Stage 2送信: ${batch.length}件`);
-      const success = await sendStage2Batch(batch, currentSettings, anonToken, applyStage2Verdict);
+      const success = await sendStage2Batch(batch, currentSettings, anonToken, applyStage2Verdict, currentVideoTitle);
       if (success) await incrementStage2Usage(batch.length);
 
       if (stage2Queue.length > 0) {
@@ -497,6 +523,21 @@ function applyFilter(
 }
 
 // ─── ユーティリティ ────────────────────────────────────────────────────────────
+
+/**
+ * 親フレーム（YouTube 動画ページ）のタイトルを取得する。
+ * チャット iframe は YouTube と同一オリジンのため window.parent.document にアクセス可能。
+ * document.title には " - YouTube" が付くため除去する。
+ */
+function getVideoTitle(): string {
+  try {
+    const title = window.parent?.document?.title ?? '';
+    return title.replace(/\s*[-–]\s*YouTube\s*$/, '').trim();
+  } catch {
+    // クロスオリジン等で取得できない場合は空文字を返す
+    return '';
+  }
+}
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));

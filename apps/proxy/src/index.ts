@@ -30,12 +30,18 @@ interface UserProgress {
 
 interface JudgeRequest {
   messages: Array<{ id: string; text: string }>;
-  gameId: string;
-  progress: UserProgress;
+  /** ゲームKB使用時に指定。ジャンルテンプレートのみの場合は null 可 */
+  gameId?: string | null;
+  /** ゲームKB使用時に指定。ジャンルテンプレートのみの場合は null 可 */
+  progress?: UserProgress | null;
   /** フィルタモード（省略時は 'standard'） */
   filterMode?: FilterMode;
   /** 有効化されているジャンルテンプレートのIDリスト */
   selectedGenreTemplates?: string[];
+  /** selectedGenreTemplates の単一ジャンル版ショートハンド（テスト・外部クライアント用） */
+  genre?: string;
+  /** YouTubeの動画タイトル（ゲーム自動推測に使用） */
+  videoTitle?: string;
 }
 
 interface FilterResult {
@@ -118,11 +124,13 @@ async function handleJudge(request: Request, env: Env): Promise<Response> {
   if (!Array.isArray(body.messages) || body.messages.length === 0) {
     return jsonError('messages must be a non-empty array', 400);
   }
-  if (!body.gameId) {
-    return jsonError('gameId is required', 400);
-  }
-  if (!body.progress) {
-    return jsonError('progress is required', 400);
+
+  // genre（文字列）は selectedGenreTemplates（配列）のショートハンドとして正規化
+  const effectiveGenreTemplates = normalizeGenreTemplates(body);
+
+  // gameId または genre/selectedGenreTemplates のいずれかが必要
+  if (!body.gameId && effectiveGenreTemplates.length === 0) {
+    return jsonError('gameId or genre/selectedGenreTemplates is required', 400);
   }
 
   const filterMode: FilterMode = body.filterMode ?? 'standard';
@@ -132,7 +140,7 @@ async function handleJudge(request: Request, env: Env): Promise<Response> {
   const results: FilterResult[] = [];
   for (const chunk of chunks) {
     const chunkResults = await Promise.all(
-      chunk.map((msg) => judgeMessage(msg, body.gameId, body.progress, filterMode, body.selectedGenreTemplates ?? [], env.ANTHROPIC_API_KEY)),
+      chunk.map((msg) => judgeMessage(msg, body.gameId, body.progress, filterMode, effectiveGenreTemplates, body.videoTitle, env.ANTHROPIC_API_KEY)),
     );
     results.push(...chunkResults);
   }
@@ -162,14 +170,15 @@ async function checkRateLimit(ip: string, kv: KVNamespace): Promise<boolean> {
 
 async function judgeMessage(
   message: { id: string; text: string },
-  gameId: string,
-  progress: UserProgress,
+  gameId: string | null | undefined,
+  progress: UserProgress | null | undefined,
   filterMode: FilterMode,
   selectedGenreTemplates: string[],
+  videoTitle: string | null | undefined,
   apiKey: string,
 ): Promise<FilterResult> {
   const progressDescription = formatProgress(progress);
-  const contextDescription = buildContextDescription(gameId, progressDescription, selectedGenreTemplates);
+  const contextDescription = buildContextDescription(gameId, progressDescription, selectedGenreTemplates, videoTitle ?? undefined);
 
   const prompt = `あなたはゲームのライブ配信チャットのネタバレ判定AIです。
 ${contextDescription}
@@ -254,7 +263,8 @@ JSON形式のみで回答（余分なテキストを含めないこと）:
 
 // ─── ヘルパー ─────────────────────────────────────────────────────────────────
 
-function formatProgress(progress: UserProgress): string {
+function formatProgress(progress: UserProgress | null | undefined): string {
+  if (!progress) return '未設定（ゲーム開始前として扱う）';
   if (progress.progressModel === 'chapter' && progress.currentChapterId) {
     return `チャプター「${progress.currentChapterId}」まで通過済み`;
   }
@@ -271,27 +281,44 @@ function formatProgress(progress: UserProgress): string {
  * ゲーム知識ベースあり + ジャンルテンプレート併用の両ケースに対応する。
  */
 function buildContextDescription(
-  gameId: string,
+  gameId: string | null | undefined,
   progressDescription: string,
   selectedGenreTemplates: string[],
+  videoTitle?: string,
 ): string {
   const genreNames = selectedGenreTemplates
     .map((id) => GENRE_NAMES[id] ?? id)
     .filter(Boolean);
 
+  const parts: string[] = [];
+
   if (genreNames.length > 0) {
     const genreLabel = genreNames.join('・');
-    // ゲームIDがデフォルト値（ace-attorney-1）であっても進行状況が未設定の場合は
-    // 「具体的なタイトル不明」として扱う
     const hasProgress = progressDescription !== '未設定（ゲーム開始前として扱う）';
-    if (hasProgress) {
-      return `ユーザーは${genreLabel}ジャンルのゲームを視聴中です。\nゲーム: ${gameId}\n現在の進行状況: ${progressDescription}\nジャンル（テンプレート）: ${genreLabel}`;
+    if (hasProgress && gameId) {
+      // ゲームKB + ジャンルテンプレート + 進行状況あり
+      parts.push(`ユーザーは${genreLabel}ジャンルのゲームを視聴中です。`);
+      parts.push(`ゲーム: ${gameId}`);
+      parts.push(`現在の進行状況: ${progressDescription}`);
+      parts.push(`ジャンル（テンプレート）: ${genreLabel}`);
+    } else {
+      // ジャンルテンプレートのみ（gameId/progress 不明）
+      parts.push(`ユーザーは${genreLabel}ジャンルのゲーム配信を視聴中です。具体的なゲームタイトルや進行状況は不明です。`);
+      parts.push(`ジャンル（テンプレート）: ${genreLabel}`);
     }
-    return `ユーザーは${genreLabel}ジャンルのゲーム配信を視聴中です。具体的なゲームタイトルや進行状況は不明です。\nジャンル（テンプレート）: ${genreLabel}`;
+  } else if (gameId) {
+    // ジャンルテンプレートなし（ゲーム知識ベースのみ）
+    parts.push(`ゲーム: ${gameId}`);
+    parts.push(`現在の進行状況: ${progressDescription}`);
   }
 
-  // ジャンルテンプレートなし（ゲーム知識ベースのみ）
-  return `ゲーム: ${gameId}\n現在の進行状況: ${progressDescription}`;
+  // 動画タイトルが提供されている場合は追加（ゲーム自動推測に活用）
+  if (videoTitle) {
+    parts.push(`配信の動画タイトル: ${videoTitle}`);
+    parts.push(`このタイトルからプレイ中のゲームを推測し、そのゲームの一般的な知識を踏まえてネタバレ判定を行ってください。ゲーム知識ベースが提供されている場合はそちらを優先してください。`);
+  }
+
+  return parts.join('\n');
 }
 
 /** LLM 判定失敗時の verdict をモードに応じて決定する。lenient では安全側（allow）に倒す。 */
@@ -318,6 +345,20 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
     chunks.push(arr.slice(i, i + size));
   }
   return chunks;
+}
+
+/**
+ * genre（文字列）と selectedGenreTemplates（配列）を統合して有効なIDリストを返す。
+ * genre は外部クライアント・テスト用のショートハンドで、selectedGenreTemplates が優先される。
+ */
+function normalizeGenreTemplates(body: JudgeRequest): string[] {
+  if (body.selectedGenreTemplates && body.selectedGenreTemplates.length > 0) {
+    return body.selectedGenreTemplates;
+  }
+  if (body.genre) {
+    return [body.genre];
+  }
+  return [];
 }
 
 function jsonOk(data: unknown): Response {
