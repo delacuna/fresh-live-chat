@@ -11,7 +11,7 @@
  * - Stage 2: プロキシ経由 LLM 判定（非同期、判定中は通常表示を維持）
  */
 
-import { buildKeywordSet, buildDescriptionPhraseSet, matchesKeyword, matchesKeywordForStage2, matchesCustomNGWord, buildActiveGenreTemplates, matchesGenreTemplate, matchesGenreKeywordForStage2 } from './filter.js';
+import { buildKeywordSet, buildDescriptionPhraseSet, matchesKeyword, matchesKeywordForStage2, matchesCustomNGWord, buildActiveGenreTemplates, matchesGenreTemplate, matchesGenreKeywordForStage2, matchesGameplayHintForStage2 } from './filter.js';
 import type { GenreTemplate } from '@spoilershield/knowledge-base';
 import { filterMessageElement, restoreMessageElement, switchDisplayMode, ATTR_FALSE_POSITIVE } from './chat-dom.js';
 import {
@@ -344,7 +344,23 @@ function processMessage(el: Element): void {
   // ── Stage 2: キーワード単体マッチ → プロキシへ委託 ──────────────────────────
   const stage2keyword = matchesKeywordForStage2(text, currentKeywords);
   if (!stage2keyword) {
-    // ゲームKBがない場合（gameId === 'other'）はジャンルテンプレートキーワードで Stage 2 を試みる
+    // gameId !== 'none' かつジャンルテンプレート選択時: 指示・攻略ヒント系フレーズを Stage 2 へ
+    if (currentSettings.gameId !== 'none' && currentGenreTemplates.length > 0) {
+      const hintPhrase = matchesGameplayHintForStage2(text, currentGenreTemplates);
+      if (hintPhrase !== null) {
+        const progress = currentSettings.progressByGame[currentSettings.gameId];
+        const cacheKey = buildStage2CacheKey(currentSettings.gameId, progress, text);
+        const cached = getCachedVerdict(cacheKey);
+        if (cached !== null) {
+          applyStage2Verdict({ text, el: new WeakRef(el), cacheKey, matchedKeyword: hintPhrase }, cached);
+          return;
+        }
+        stage2Queue.push({ text, el: new WeakRef(el), cacheKey, matchedKeyword: hintPhrase });
+        scheduleDrain();
+        return;
+      }
+    }
+    // ゲームKBがない場合（gameId === 'other'）はジャンルキーワード単体でも Stage 2 を試みる
     if (currentSettings.gameId === 'other' && currentGenreTemplates.length > 0) {
       const genreKeyword = matchesGenreKeywordForStage2(text, currentGenreTemplates);
       if (genreKeyword) {

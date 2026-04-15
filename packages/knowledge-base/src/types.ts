@@ -14,6 +14,8 @@ export interface GenreTemplate {
   keywords: string[];
   /** ネタバレ文脈表現（単体でフィルタ対象となる表現） */
   context_phrases: string[];
+  /** Stage 2送信フレーズ（即時フィルタせず、LLMに最終判断を委ねる表現） */
+  stage2_phrases?: string[];
 }
 
 export type ProgressType = "chapter" | "event";

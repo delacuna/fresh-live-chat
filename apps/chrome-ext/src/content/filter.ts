@@ -210,6 +210,27 @@ export function matchesGenreTemplate(text: string, templates: GenreTemplate[]): 
 }
 
 /**
+ * 指示・攻略ヒント系フレーズの Stage 2 候補判定。
+ * template.stage2_phrases に部分マッチした場合、即時フィルタせず Stage 2 に委ねる。
+ * gameId !== 'none' であれば全ゲームモードで使用する。
+ *
+ * @returns マッチしたフレーズ、またはマッチなしは null
+ */
+export function matchesGameplayHintForStage2(text: string, templates: GenreTemplate[]): string | null {
+  if (templates.length === 0) return null;
+  const normalized = normalizeKana(text);
+  for (const template of templates) {
+    if (!template.stage2_phrases?.length) continue;
+    for (const phrase of template.stage2_phrases) {
+      if (normalized.includes(normalizeKana(phrase))) {
+        return phrase;
+      }
+    }
+  }
+  return null;
+}
+
+/**
  * ジャンルテンプレートの Stage 2 候補判定。
  * Stage 1 でフィルタされなかったコメントのうち、ジャンルキーワードに部分マッチしたものを返す。
  * gameId === 'other'（ゲームKBなし）の場合のみ使用する。
