@@ -1,0 +1,79 @@
+# Chrome Web Store Description (English)
+
+---
+
+## Short Description (132 characters max)
+
+AI-powered spoiler filter for YouTube game stream chats. Works on archives and live streams. No account needed — just install and play.
+
+---
+
+## Full Description
+
+### SpoilerShield — Spoiler Filter for Game Stream Chats
+
+You're watching a game stream archive, fully immersed — then the chat flashes "the final boss is [character]" or "this is a scripted loss, don't bother." SpoilerShield stops that.
+
+**SpoilerShield** is a Chrome extension that automatically detects and hides spoiler comments in YouTube game stream chats, so you can watch at your own pace without fear of spoilers.
+
+
+### Key Features
+
+**2-Stage AI Filtering**
+- Stage 1 (instant): Fast keyword matching that catches obvious spoilers immediately
+- Stage 2 (AI): Claude AI reads context to distinguish genuine spoilers from innocent comments
+- Double-layer design minimizes both false positives and missed spoilers
+
+**Archive & Live Support**
+- Filters chat replays on archived (VOD) streams
+- Also works on live streams in real time
+
+**Genre Templates**
+- Select a genre (RPG, Mystery, Action-Horror, etc.) to improve detection accuracy without needing a game-specific database
+- Detects gameplay advice and instruction-style comments ("save your ammo," "this is a forced loss") that can also ruin the experience
+
+**Progress-Aware Filtering**
+- Register how far you've progressed in the game, and SpoilerShield won't hide comments about content you've already seen
+- Automatically distinguishes future spoilers from already-unlocked story beats
+
+**Auto Game Detection from Video Title**
+- Automatically infers the game being played from the video title for smarter AI judgment — no manual setup needed
+
+**Custom Block Words**
+- Build your own block list for any words or phrases you want to hide instantly
+
+**3 Filter Strength Levels**
+- Strict: Block spoilers + gameplay hints
+- Standard: Block clear spoilers only (default)
+- Off: Disable filtering
+
+
+### How to Use
+
+1. Install from the Chrome Web Store (no account or login required)
+2. Open any YouTube game stream page
+3. Click the SpoilerShield icon in the top-right corner
+4. Select your game title or genre — done
+
+Settings apply instantly. SpoilerShield works automatically from that point on.
+
+
+### Privacy
+
+- **All data stored locally**: Settings and cached results are stored only in your browser — never on external servers
+- **Chat content is never logged**: Comment text is sent to our AI service for judgment, but is never stored or recorded
+- **No API key needed**: SpoilerShield manages API access through a secure proxy — you don't need to provide any keys
+- **No account required**: Install and use immediately, no sign-up needed
+
+Full privacy policy: https://github.com/playnicelab/spoilershield/blob/main/docs/privacy-policy.md
+
+
+### Supported Platforms
+
+- YouTube (archives and live streams)
+
+
+### Source Code
+
+SpoilerShield is open source:
+https://github.com/playnicelab/spoilershield
