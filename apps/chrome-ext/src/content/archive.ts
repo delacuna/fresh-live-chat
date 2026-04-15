@@ -123,9 +123,6 @@ export function startArchiveMode(mode: 'archive' | 'live' = 'archive'): void {
 
   // 動画タイトルを取得（親フレームの document.title から "- YouTube" を除去）
   currentVideoTitle = getVideoTitle();
-  if (currentVideoTitle) {
-    console.log(`[SpoilerShield] 動画タイトル取得: "${currentVideoTitle}"`);
-  }
 
   // 動画単位のフィルタカウンターをリセット（リロード・別動画への移動時）
   chrome.storage.local.set({ [FILTER_COUNT_KEY]: 0 });
@@ -325,7 +322,6 @@ function processMessage(el: Element): void {
   const customNgWords = currentSettings.customNgWords ?? [];
   const matchedNgWord = matchesCustomNGWord(text, customNgWords);
   if (matchedNgWord !== null) {
-    console.log(`[SpoilerShield] カスタムNGワード: "${text.slice(0, 20)}" → フィルタ (${matchedNgWord})`);
     applyFilter(el, text, matchedNgWord);
     return;
   }
@@ -333,7 +329,6 @@ function processMessage(el: Element): void {
   // ── ジャンルテンプレート: 即時判定（ゲーム知識ベースと独立） ──────────────────
   const matchedGenre = matchesGenreTemplate(text, currentGenreTemplates);
   if (matchedGenre !== null) {
-    console.log(`[SpoilerShield] ジャンルテンプレート: "${text.slice(0, 20)}" → フィルタ (${matchedGenre})`);
     applyFilter(el, text, matchedGenre);
     return;
   }
@@ -342,8 +337,6 @@ function processMessage(el: Element): void {
   const matchResult = matchesKeyword(text, currentKeywords, currentDescriptionPhrases);
 
   if (matchResult !== null) {
-    const matchInfo = matchResult.keyword ?? matchResult.phrase ?? matchResult.reason;
-    console.log(`[SpoilerShield] Stage 1結果: ${text.slice(0, 20)} → フィルタ (${matchInfo})`);
     applyFilter(el, text, matchResult.keyword, matchResult.verb ?? matchResult.phrase);
     return;
   }
@@ -355,7 +348,6 @@ function processMessage(el: Element): void {
     if (currentSettings.gameId === 'other' && currentGenreTemplates.length > 0) {
       const genreKeyword = matchesGenreKeywordForStage2(text, currentGenreTemplates);
       if (genreKeyword) {
-        console.log(`[SpoilerShield] ジャンルStage2候補: ${text.slice(0, 20)} (keyword: ${genreKeyword})`);
         const cacheKey = buildStage2CacheKey('other', undefined, text);
         const cached = getCachedVerdict(cacheKey);
         if (cached !== null) {
@@ -368,7 +360,6 @@ function processMessage(el: Element): void {
     }
     return;
   }
-  console.log(`[SpoilerShield] Stage 1結果: ${text.slice(0, 20)} → Stage2候補 (keyword: ${stage2keyword})`);
 
   const progress = currentSettings.progressByGame[currentSettings.gameId];
   const cacheKey = buildStage2CacheKey(currentSettings.gameId, progress, text);
@@ -431,7 +422,8 @@ async function drainStage2Queue(): Promise<void> {
       }
 
       const batch = stage2Queue.splice(0, 5);
-      console.log(`[SpoilerShield] Stage 2送信: ${batch.length}件`);
+      // clearStage2Queue() との非同期レースでバッチが空になる場合があるため送信をスキップ
+      if (batch.length === 0) break;
       const success = await sendStage2Batch(batch, currentSettings, anonToken, applyStage2Verdict, currentVideoTitle);
       if (success) await incrementStage2Usage(batch.length);
 
@@ -476,7 +468,6 @@ function applyStage2Verdict(candidate: Stage2Candidate, entry: JudgeCacheEntry):
   // ユーザーが展開済みのテキストはスキップ
   if (revealedTexts.has(candidate.text)) return;
 
-  console.log(`[SpoilerShield] Stage 2 フィルタ: "${candidate.text}" (${entry.spoilerCategory ?? 'uncertain'})`);
   applyFilter(el, candidate.text, candidate.matchedKeyword, undefined, entry.spoilerCategory);
 }
 

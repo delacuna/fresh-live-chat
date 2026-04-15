@@ -173,7 +173,6 @@ export async function sendStage2Batch(
       };
 
       const verdict = verdictFromCache(entry, settings.filterMode);
-      console.log(`[SpoilerShield] Stage 2結果: ${candidate.text.slice(0, 20)} → ${verdict} (${spoilerCategory ?? 'uncertain'})`);
       await saveJudgeCacheEntry(candidate.cacheKey, entry);
       onResult(candidate, entry);
     }
