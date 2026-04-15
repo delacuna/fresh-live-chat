@@ -37,6 +37,8 @@ export interface Settings {
   proxyUrl: string;
   /** ユーザー定義のカスタム NG ワード一覧 */
   customNgWords: CustomNGWord[];
+  /** 有効化されているジャンルテンプレートのIDリスト */
+  selectedGenreTemplates: string[];
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -47,6 +49,7 @@ export const DEFAULT_SETTINGS: Settings = {
   displayMode: 'placeholder',
   proxyUrl: 'https://spoilershield-proxy.playnicelab.workers.dev',
   customNgWords: [],
+  selectedGenreTemplates: [],
 };
 
 /** メイン設定のストレージキー。書き込みはポップアップのみ行う。 */

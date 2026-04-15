@@ -1,4 +1,5 @@
-export type { KBGame, KBChapter, KBSpoilerEntity, ProgressType, SpoilerCategory, SpoilerLevel } from "./types.js";
+export type { KBGame, KBChapter, KBSpoilerEntity, ProgressType, SpoilerCategory, SpoilerLevel, GenreTemplate } from "./types.js";
+export { getAllGenreTemplates, ALL_GENRE_TEMPLATES } from "./genre-templates.js";
 
 /**
  * 知識ベースJSONをインポートし、IDでアクセスするためのレジストリ

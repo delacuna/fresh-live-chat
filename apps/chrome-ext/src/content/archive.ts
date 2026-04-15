@@ -11,7 +11,8 @@
  * - Stage 2: プロキシ経由 LLM 判定（非同期、判定中は通常表示を維持）
  */
 
-import { buildKeywordSet, buildDescriptionPhraseSet, matchesKeyword, matchesKeywordForStage2, matchesCustomNGWord } from './filter.js';
+import { buildKeywordSet, buildDescriptionPhraseSet, matchesKeyword, matchesKeywordForStage2, matchesCustomNGWord, buildActiveGenreTemplates, matchesGenreTemplate } from './filter.js';
+import type { GenreTemplate } from '@spoilershield/knowledge-base';
 import { filterMessageElement, restoreMessageElement, switchDisplayMode, ATTR_FALSE_POSITIVE } from './chat-dom.js';
 import {
   loadSettings,
@@ -78,6 +79,7 @@ function shutdownOnInvalidContext(): void {
 let currentSettings: Settings | null = null;
 let currentKeywords: Set<string> = new Set();
 let currentDescriptionPhrases: Set<string> = new Set();
+let currentGenreTemplates: GenreTemplate[] = [];
 let itemsContainerRef: Element | null = null;
 
 /** #items の childList を監視する Observer（pause/resume のために保持） */
@@ -140,7 +142,8 @@ export function startArchiveMode(mode: 'archive' | 'live' = 'archive'): void {
         prev?.gameId === next.gameId &&
         prev?.filterMode === next.filterMode &&
         JSON.stringify(prev?.progressByGame) === JSON.stringify(next.progressByGame) &&
-        JSON.stringify(prev?.customNgWords) === JSON.stringify(next.customNgWords);
+        JSON.stringify(prev?.customNgWords) === JSON.stringify(next.customNgWords) &&
+        JSON.stringify(prev?.selectedGenreTemplates) === JSON.stringify(next.selectedGenreTemplates);
 
       currentSettings = next;
       currentKeywords = buildKeywordsFromSettings(next);
@@ -175,6 +178,7 @@ export function startArchiveMode(mode: 'archive' | 'live' = 'archive'): void {
 function buildKeywordsFromSettings(settings: Settings): Set<string> {
   const progress = settings.progressByGame[settings.gameId];
   currentDescriptionPhrases = buildDescriptionPhraseSet(settings.gameId);
+  currentGenreTemplates = buildActiveGenreTemplates(settings.selectedGenreTemplates ?? []);
   return buildKeywordSet(settings.gameId, settings.filterMode, progress);
 }
 
@@ -314,6 +318,14 @@ function processMessage(el: Element): void {
   if (matchedNgWord !== null) {
     console.log(`[SpoilerShield] カスタムNGワード: "${text.slice(0, 20)}" → フィルタ (${matchedNgWord})`);
     applyFilter(el, text, matchedNgWord);
+    return;
+  }
+
+  // ── ジャンルテンプレート: 即時判定（ゲーム知識ベースと独立） ──────────────────
+  const matchedGenre = matchesGenreTemplate(text, currentGenreTemplates);
+  if (matchedGenre !== null) {
+    console.log(`[SpoilerShield] ジャンルテンプレート: "${text.slice(0, 20)}" → フィルタ (${matchedGenre})`);
+    applyFilter(el, text, matchedGenre);
     return;
   }
 

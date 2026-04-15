@@ -3,6 +3,19 @@
  * packages/shared の型を知識ベース用に具体化したもの（snake_case）
  */
 
+export interface GenreTemplate {
+  /** テンプレートID */
+  id: string;
+  /** 表示名 */
+  name: string;
+  /** 説明 */
+  description: string;
+  /** キーワード（ネタバレ動詞と組み合わせてフィルタ） */
+  keywords: string[];
+  /** ネタバレ文脈表現（単体でフィルタ対象となる表現） */
+  context_phrases: string[];
+}
+
 export type ProgressType = "chapter" | "event";
 
 export type SpoilerCategory =

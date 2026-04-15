@@ -13,6 +13,7 @@ import {
   type CustomNGWord,
 } from '../shared/settings.js';
 import type { KBGame } from '@spoilershield/knowledge-base';
+import { getAllGenreTemplates } from '@spoilershield/knowledge-base';
 import aceAttorney1 from '@kb-data/ace-attorney-1.json';
 
 const GAMES: KBGame[] = [aceAttorney1 as unknown as KBGame];
@@ -177,6 +178,44 @@ function CustomNGWordSection({
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+// ─── ジャンルテンプレートセクション ────────────────────────────────────
+
+function GenreTemplateSection({
+  selectedIds,
+  onChange,
+}: {
+  selectedIds: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  const templates = getAllGenreTemplates();
+  const toggle = (id: string) => {
+    if (selectedIds.includes(id)) {
+      onChange(selectedIds.filter((i) => i !== id));
+    } else {
+      onChange([...selectedIds, id]);
+    }
+  };
+
+  return (
+    <div className="space-y-1.5">
+      {templates.map((t) => (
+        <label key={t.id} className="flex items-start gap-2 text-sm cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={selectedIds.includes(t.id)}
+            onChange={() => toggle(t.id)}
+            className="rounded border-gray-300 text-indigo-600 mt-0.5 shrink-0"
+          />
+          <div className="min-w-0">
+            <span className="font-medium">{t.name}</span>
+            <span className="text-xs text-gray-400 ml-1.5">{t.description}</span>
+          </div>
+        </label>
+      ))}
     </div>
   );
 }
@@ -348,6 +387,14 @@ export default function App() {
           <CustomNGWordSection
             words={settings.customNgWords ?? []}
             onChange={(words) => update({ customNgWords: words })}
+          />
+        </Section>
+
+        {/* ジャンル別テンプレート */}
+        <Section label="ジャンル別テンプレート">
+          <GenreTemplateSection
+            selectedIds={settings.selectedGenreTemplates ?? []}
+            onChange={(ids) => update({ selectedGenreTemplates: ids })}
           />
         </Section>
 

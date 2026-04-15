@@ -34,6 +34,8 @@ interface JudgeRequest {
   progress: UserProgress;
   /** フィルタモード（省略時は 'standard'） */
   filterMode?: FilterMode;
+  /** 有効化されているジャンルテンプレートのIDリスト */
+  selectedGenreTemplates?: string[];
 }
 
 interface FilterResult {
@@ -48,6 +50,15 @@ interface FilterResult {
 interface JudgeResponse {
   results: FilterResult[];
 }
+
+// ─── ジャンルテンプレート名マッピング ─────────────────────────────────────────
+
+const GENRE_NAMES: Record<string, string> = {
+  'rpg':           'RPG',
+  'mystery':       '推理・ミステリー',
+  'action-horror': 'アクション・ホラー',
+  'story-general': 'ストーリー全般',
+};
 
 // ─── レート制限設定 ───────────────────────────────────────────────────────────
 
@@ -121,7 +132,7 @@ async function handleJudge(request: Request, env: Env): Promise<Response> {
   const results: FilterResult[] = [];
   for (const chunk of chunks) {
     const chunkResults = await Promise.all(
-      chunk.map((msg) => judgeMessage(msg, body.gameId, body.progress, filterMode, env.ANTHROPIC_API_KEY)),
+      chunk.map((msg) => judgeMessage(msg, body.gameId, body.progress, filterMode, body.selectedGenreTemplates ?? [], env.ANTHROPIC_API_KEY)),
     );
     results.push(...chunkResults);
   }
@@ -154,13 +165,14 @@ async function judgeMessage(
   gameId: string,
   progress: UserProgress,
   filterMode: FilterMode,
+  selectedGenreTemplates: string[],
   apiKey: string,
 ): Promise<FilterResult> {
   const progressDescription = formatProgress(progress);
+  const contextDescription = buildContextDescription(gameId, progressDescription, selectedGenreTemplates);
 
   const prompt = `あなたはゲームのライブ配信チャットのネタバレ判定AIです。
-ゲーム: ${gameId}
-現在の進行状況: ${progressDescription}
+${contextDescription}
 以下のチャットメッセージを判定してください。
 
 メッセージ: "${message.text}"
@@ -250,6 +262,36 @@ function formatProgress(progress: UserProgress): string {
     return `通過済みイベント: ${progress.completedEventIds.join(', ')}`;
   }
   return '未設定（ゲーム開始前として扱う）';
+}
+
+/**
+ * LLM プロンプト用のコンテキスト説明文を生成する。
+ *
+ * ジャンルテンプレートのみ使用時（ゲーム知識ベースの進行状況未設定）と
+ * ゲーム知識ベースあり + ジャンルテンプレート併用の両ケースに対応する。
+ */
+function buildContextDescription(
+  gameId: string,
+  progressDescription: string,
+  selectedGenreTemplates: string[],
+): string {
+  const genreNames = selectedGenreTemplates
+    .map((id) => GENRE_NAMES[id] ?? id)
+    .filter(Boolean);
+
+  if (genreNames.length > 0) {
+    const genreLabel = genreNames.join('・');
+    // ゲームIDがデフォルト値（ace-attorney-1）であっても進行状況が未設定の場合は
+    // 「具体的なタイトル不明」として扱う
+    const hasProgress = progressDescription !== '未設定（ゲーム開始前として扱う）';
+    if (hasProgress) {
+      return `ユーザーは${genreLabel}ジャンルのゲームを視聴中です。\nゲーム: ${gameId}\n現在の進行状況: ${progressDescription}\nジャンル（テンプレート）: ${genreLabel}`;
+    }
+    return `ユーザーは${genreLabel}ジャンルのゲーム配信を視聴中です。具体的なゲームタイトルや進行状況は不明です。\nジャンル（テンプレート）: ${genreLabel}`;
+  }
+
+  // ジャンルテンプレートなし（ゲーム知識ベースのみ）
+  return `ゲーム: ${gameId}\n現在の進行状況: ${progressDescription}`;
 }
 
 /** LLM 判定失敗時の verdict をモードに応じて決定する。lenient では安全側（allow）に倒す。 */

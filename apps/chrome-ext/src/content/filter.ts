@@ -14,7 +14,8 @@
  * - 進行状況未設定の場合は安全側に倒して全キーワードをブロック対象とする
  */
 
-import type { KBGame } from '@spoilershield/knowledge-base';
+import type { KBGame, GenreTemplate } from '@spoilershield/knowledge-base';
+import { getAllGenreTemplates } from '@spoilershield/knowledge-base';
 import aceAttorney1 from '@kb-data/ace-attorney-1.json';
 import { getBlockedLevels, type FilterMode, type GameProgress, type CustomNGWord } from '../shared/settings.js';
 import { matchesSpoilerVerb, normalizeKana } from '@spoilershield/shared';
@@ -162,6 +163,48 @@ export function matchesCustomNGWord(text: string, words: CustomNGWord[]): string
   for (const entry of words) {
     if (!entry.enabled) continue;
     if (normalized.includes(normalizeKana(entry.word))) return entry.word;
+  }
+  return null;
+}
+
+/**
+ * 有効なジャンルテンプレートIDリストから GenreTemplate[] を構築する。
+ */
+export function buildActiveGenreTemplates(selectedIds: string[]): GenreTemplate[] {
+  if (selectedIds.length === 0) return [];
+  const all = getAllGenreTemplates();
+  return all.filter((t) => selectedIds.includes(t.id));
+}
+
+/**
+ * ジャンルテンプレートによる即時判定。
+ *
+ * マッチ条件（いずれか）:
+ *   1. テンプレートの context_phrases に部分一致（単体でネタバレを示す表現）
+ *   2. テンプレートの keywords に部分一致 かつ SPOILER_VERBS にも一致
+ *
+ * @returns マッチした phrase または keyword、マッチなしは null
+ */
+export function matchesGenreTemplate(text: string, templates: GenreTemplate[]): string | null {
+  if (templates.length === 0) return null;
+  const normalized = normalizeKana(text);
+
+  for (const template of templates) {
+    // パターン1: 文脈表現の直接マッチ
+    for (const phrase of template.context_phrases) {
+      if (normalized.includes(normalizeKana(phrase))) {
+        return phrase;
+      }
+    }
+    // パターン2: キーワード + ネタバレ動詞の組み合わせ
+    const verb = matchesSpoilerVerb(text);
+    if (verb !== null) {
+      for (const kw of template.keywords) {
+        if (normalized.includes(normalizeKana(kw))) {
+          return kw;
+        }
+      }
+    }
   }
   return null;
 }

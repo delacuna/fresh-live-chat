@@ -130,6 +130,7 @@ export async function sendStage2Batch(
     gameId: settings.gameId,
     progress: buildProxyProgress(settings.gameId, progress),
     filterMode: settings.filterMode,
+    selectedGenreTemplates: settings.selectedGenreTemplates ?? [],
   };
 
   try {
