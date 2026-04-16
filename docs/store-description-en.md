@@ -30,7 +30,7 @@ Have you ever had your enjoyment ruined by spoilers, hints, or unsolicited advic
 
 **Genre Templates**
 - Select a genre (RPG, Mystery, Action-Horror, etc.) to improve detection accuracy without needing a game-specific database
-- Detects gameplay advice and instruction-style comments ("you should explore this area properly," "this is a scripted loss") that can also ruin the experience
+- Detects gameplay advice and instruction-style comments ("there's somewhere you haven't been yet," "this is a scripted loss") that can also ruin the experience
 
 **Progress-Aware Filtering**
 - Register how far you've progressed in the game, and Fresh Live Chat won't hide comments about content you've already seen
@@ -43,9 +43,9 @@ Have you ever had your enjoyment ruined by spoilers, hints, or unsolicited advic
 - Build your own block list for any words or phrases you want to hide instantly
 
 **3 Filter Strength Levels**
-- Strict: Block spoilers + gameplay hints
-- Standard: Block clear spoilers only (default)
-- Off: Disable filtering
+- Strict: Block spoilers, foreshadowing, and gameplay advice
+- Standard: Block clear spoilers and foreshadowing only (default)
+- Lenient: Block only explicit spoilers
 
 
 ### How to Use
