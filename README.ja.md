@@ -6,7 +6,7 @@
 
 ---
 
-Fresh Live Chat は、YouTubeのゲーム配信（ライブ・アーカイブ）のチャット欄から、ネタバレ・匂わせ・攻略ヒントなどを自動検出・非表示にする Chrome 拡張機能です。ゲームを自分のペースで楽しみたい人のために作りました。
+Fresh Live Chat は、YouTubeのゲーム配信（ライブ・アーカイブ）のチャット欄から、ネタバレ・匂わせ・攻略ヒントなどを自動検出・非表示にする Chrome 拡張機能です。限られた推しとの時間を、誰もがより快適に過ごせるようにと思って作りました。
 
 フィルタリングは2段階で行われます。まずキーワードマッチによる瞬時の検出、次に Claude AI が文脈を理解してより精密に判定します。アカウント登録不要。インストールするだけで動作します。
 
@@ -147,4 +147,4 @@ MIT
 
 ## 問い合わせ・バグ報告
 
-[GitHub Issues](https://github.com/delacuna/fresh-live-chat/issues) からお気軽にどうぞ。
+[GitHub Issues](https://github.com/delacuna/fresh-live-chat/issues) からお気軽にお問合せください。

@@ -6,7 +6,7 @@
 
 ---
 
-Fresh Live Chat is a Chrome extension that automatically detects and hides spoilers, foreshadowing, and gameplay advice from YouTube game stream chats — so you can watch at your own pace without fear of having your experience ruined.
+Fresh Live Chat is a Chrome extension that automatically detects and hides spoilers, foreshadowing, and gameplay advice from YouTube game stream chats. Built for everyone who wants to make the most of their time watching their favorite streamers — without having that experience ruined.
 
 Filtering is handled in two stages: instant keyword matching for obvious spoilers, followed by Claude AI context analysis for subtler cases. No account required — just install and play.
 
