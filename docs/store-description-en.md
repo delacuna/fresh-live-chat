@@ -68,6 +68,11 @@ Settings apply instantly. Fresh Live Chat works automatically from that point on
 Full privacy policy: https://github.com/playnicelab/spoilershield/blob/main/docs/privacy-policy.md
 
 
+### A Note on Accuracy
+
+Fresh Live Chat uses AI to understand context, but cannot guarantee every spoiler will be caught. Detection accuracy is highest for games with dedicated support in our database. For other titles, enabling genre templates and custom block words can significantly improve results. If something is incorrectly filtered, use the "❌ False positive" button next to the comment to report it — your reports help us improve future accuracy.
+
+
 ### Supported Platforms
 
 - YouTube (archives and live streams)
