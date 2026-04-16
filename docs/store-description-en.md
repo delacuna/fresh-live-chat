@@ -12,7 +12,7 @@ AI-powered spoiler filter for YouTube game stream chats. Works on archives and l
 
 ### Fresh Live Chat — Spoiler Filter for Game Stream Chats
 
-You're watching a game stream archive, fully immersed — then the chat flashes "the final boss is [character]" or "this is a scripted loss, don't bother." Fresh Live Chat stops that.
+Have you ever had your enjoyment ruined by spoilers, hints, or unsolicited advice flooding the chat while watching a game stream or archive? Fresh Live Chat puts a stop to that.
 
 **Fresh Live Chat** is a Chrome extension that automatically detects and hides spoiler comments in YouTube game stream chats, so you can watch at your own pace without fear of spoilers.
 
@@ -30,11 +30,11 @@ You're watching a game stream archive, fully immersed — then the chat flashes 
 
 **Genre Templates**
 - Select a genre (RPG, Mystery, Action-Horror, etc.) to improve detection accuracy without needing a game-specific database
-- Detects gameplay advice and instruction-style comments ("save your ammo," "this is a forced loss") that can also ruin the experience
+- Detects gameplay advice and instruction-style comments ("you should explore this area properly," "this is a scripted loss") that can also ruin the experience
 
 **Progress-Aware Filtering**
 - Register how far you've progressed in the game, and Fresh Live Chat won't hide comments about content you've already seen
-- Automatically distinguishes future spoilers from already-unlocked story beats
+- Automatically distinguishes spoilers ahead of your progress from content you've already seen
 
 **Auto Game Detection from Video Title**
 - Automatically infers the game being played from the video title for smarter AI judgment — no manual setup needed
@@ -65,7 +65,7 @@ Settings apply instantly. Fresh Live Chat works automatically from that point on
 - **No API key needed**: Fresh Live Chat manages API access through a secure proxy — you don't need to provide any keys
 - **No account required**: Install and use immediately, no sign-up needed
 
-Full privacy policy: https://github.com/playnicelab/spoilershield/blob/main/docs/privacy-policy.md
+Full privacy policy: https://github.com/delacuna/fresh-live-chat/blob/main/docs/privacy-policy.md
 
 
 ### A Note on Accuracy
@@ -81,4 +81,4 @@ Fresh Live Chat uses AI to understand context, but cannot guarantee every spoile
 ### Source Code
 
 Fresh Live Chat is open source:
-https://github.com/playnicelab/spoilershield
+https://github.com/delacuna/fresh-live-chat.git

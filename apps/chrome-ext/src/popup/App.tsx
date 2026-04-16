@@ -244,6 +244,9 @@ function ProgressSettings({
           </option>
         ))}
       </select>
+      <p className="text-xs text-gray-400 mt-1.5">
+        現在プレイ中（未クリア）のチャプターを選択してください。選択したチャプター以降のネタバレをブロックします。
+      </p>
     );
   }
 
