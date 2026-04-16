@@ -147,4 +147,4 @@ MIT
 
 ## 問い合わせ・バグ報告
 
-[GitHub Issues](https://github.com/delacuna/fresh-live-chat/issues) からお気軽にお問合せください。
+[GitHub Issues](https://github.com/delacuna/fresh-live-chat/issues) からお気軽にお問い合わせください。
