@@ -141,7 +141,7 @@ Configure the proxy URL in the extension popup under the settings if needed.
 
 ## License
 
-MIT
+[MIT](LICENSE) © 2026 delacuna
 
 ---
 

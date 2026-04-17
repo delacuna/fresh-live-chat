@@ -141,7 +141,7 @@ pnpm wrangler dev   # http://localhost:8787 でローカルプロキシが起動
 
 ## ライセンス
 
-MIT
+[MIT](LICENSE) © 2026 delacuna
 
 ---
 
