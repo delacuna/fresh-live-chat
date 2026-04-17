@@ -51,6 +51,12 @@ const ATTR_FILTERED = 'data-flc-filtered';
 /** Stage 2 判定待ちを示す属性 */
 const ATTR_PENDING = 'data-flc-pending';
 
+/** Stage 2 判定待ち中に非表示にした行要素を示す属性 */
+const ATTR_PENDING_ROW = 'data-flc-pending-row';
+
+/** Stage 2 タイムアウト時間（ms）。これを超えたら強制的に表示に戻す */
+const STAGE2_PENDING_TIMEOUT_MS = 5000;
+
 // ─── コンテキスト有効性チェック ───────────────────────────────────────────────
 
 /**
@@ -74,7 +80,7 @@ function shutdownOnInvalidContext(): void {
   console.log('[FreshLiveChat] 拡張コンテキストが無効になりました。監視を停止します。');
   itemsObserver?.disconnect();
   itemsObserver = null;
-  stage2Queue = [];
+  clearStage2Queue();
 }
 
 // ─── モジュールスコープ状態 ───────────────────────────────────────────────────
@@ -109,6 +115,9 @@ const revealedTexts = new Set<string>();
 
 /** Stage 2 判定待ちキュー */
 let stage2Queue: Stage2Candidate[] = [];
+
+/** Stage 2 タイムアウトタイマー（cacheKey → timer ID） */
+const stage2PendingTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
 
 /** Stage 2 判定を実行中かどうか（再入防止） */
 let isDraining = false;
@@ -312,18 +321,17 @@ function processMessage(el: Element): void {
     el.removeAttribute('data-flc-original');
     el.removeAttribute('data-flc-matched-keyword');
     el.removeAttribute('data-flc-matched-context');
-    el.removeAttribute(ATTR_PENDING);
     (el as HTMLElement).style.cursor = '';
-    (el as HTMLElement).style.opacity = '';
+    if (el.hasAttribute(ATTR_PENDING)) showPendingElement(el);
   }
 
   // Stage 2 判定待ち中の要素: テキストが一致していればキュー済みなのでスキップ
-  // テキストが変わっていれば YouTube が DOM を使い回したためグレーアウトを解除して再処理
+  // テキストが変わっていれば YouTube が DOM を使い回したため非表示を解除して再処理
   if (el.getAttribute(ATTR_PENDING) === 'true') {
     const currentText = el.textContent?.trim() ?? '';
     const isStillQueued = stage2Queue.some((c) => c.el.deref() === el && c.text === currentText);
     if (isStillQueued) return;
-    clearGrayout(el);
+    showPendingElement(el);
   }
 
   const text = el.textContent?.trim() ?? '';
@@ -368,7 +376,7 @@ function processMessage(el: Element): void {
           applyStage2Verdict({ text, el: new WeakRef(el), cacheKey, matchedKeyword: hintPhrase }, cached);
           return;
         }
-        grayoutElement(el);
+        hidePendingElement(el, cacheKey);
         stage2Queue.push({ text, el: new WeakRef(el), cacheKey, matchedKeyword: hintPhrase });
         scheduleDrain();
         return;
@@ -384,7 +392,7 @@ function processMessage(el: Element): void {
           applyStage2Verdict({ text, el: new WeakRef(el), cacheKey, matchedKeyword: genreKeyword }, cached);
           return;
         }
-        grayoutElement(el);
+        hidePendingElement(el, cacheKey);
         stage2Queue.push({ text, el: new WeakRef(el), cacheKey, matchedKeyword: genreKeyword });
         scheduleDrain();
       }
@@ -402,8 +410,8 @@ function processMessage(el: Element): void {
     return;
   }
 
-  // 未判定: キューに追加して後送（判定中はグレーアウト表示）
-  grayoutElement(el);
+  // 未判定: キューに追加して後送（判定中は非表示）
+  hidePendingElement(el, cacheKey);
   stage2Queue.push({ text, el: new WeakRef(el), cacheKey, matchedKeyword: stage2keyword });
   scheduleDrain();
 }
@@ -411,9 +419,11 @@ function processMessage(el: Element): void {
 // ─── Stage 2 キュー管理 ────────────────────────────────────────────────────────
 
 function clearStage2Queue(): void {
+  for (const timer of stage2PendingTimeouts.values()) clearTimeout(timer);
+  stage2PendingTimeouts.clear();
   for (const candidate of stage2Queue) {
     const el = candidate.el.deref();
-    if (el) clearGrayout(el);
+    if (el) showPendingElement(el);
   }
   stage2Queue = [];
 }
@@ -484,8 +494,14 @@ async function drainStage2Queue(): Promise<void> {
 function applyStage2Verdict(candidate: Stage2Candidate, entry: JudgeCacheEntry): void {
   if (!currentSettings) return;
 
+  // タイムアウトをキャンセルして非表示を解除
+  const timer = stage2PendingTimeouts.get(candidate.cacheKey);
+  if (timer !== undefined) {
+    clearTimeout(timer);
+    stage2PendingTimeouts.delete(candidate.cacheKey);
+  }
   const el = candidate.el.deref();
-  if (el) clearGrayout(el); // 判定完了: グレーアウトを解除
+  if (el) showPendingElement(el);
 
   const verdict = verdictFromCache(entry, currentSettings.filterMode);
   if (verdict === 'allow') return;
@@ -572,14 +588,34 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** Stage 2 判定待ち中のコメントをグレーアウトする */
-function grayoutElement(el: Element): void {
-  (el as HTMLElement).style.opacity = '0.3';
+/**
+ * Stage 2 判定待ち中のコメント行を非表示にし、タイムアウトをセットする。
+ * 5秒以内に判定が返らなければ強制的に表示に戻す（ネットワークエラー等の対策）。
+ */
+function hidePendingElement(el: Element, cacheKey: string): void {
   el.setAttribute(ATTR_PENDING, 'true');
+  const row =
+    el.closest('yt-live-chat-text-message-renderer') ??
+    el.closest('yt-live-chat-paid-message-renderer') ??
+    el.parentElement;
+  if (row) {
+    row.setAttribute(ATTR_PENDING_ROW, 'true');
+    (row as HTMLElement).style.display = 'none';
+  }
+
+  const timer = setTimeout(() => {
+    stage2PendingTimeouts.delete(cacheKey);
+    showPendingElement(el);
+  }, STAGE2_PENDING_TIMEOUT_MS);
+  stage2PendingTimeouts.set(cacheKey, timer);
 }
 
-/** グレーアウトを解除して通常表示に戻す */
-function clearGrayout(el: Element): void {
-  (el as HTMLElement).style.opacity = '';
+/** 判定待ち非表示を解除して通常表示に戻す */
+function showPendingElement(el: Element): void {
   el.removeAttribute(ATTR_PENDING);
+  const row = el.closest(`[${ATTR_PENDING_ROW}]`);
+  if (row) {
+    row.removeAttribute(ATTR_PENDING_ROW);
+    (row as HTMLElement).style.display = '';
+  }
 }
