@@ -7,3 +7,8 @@ dist/
 .wrangler/
 .dev.vars
 test-request*.json
+
+# ローカル開発専用ドキュメント（GitHub非公開）
+PROJECT_PLAN.md
+CLAUDE.md
+TROUBLESHOOTING.md
