@@ -24,6 +24,12 @@ export type {
 
 export type { MisreportEntry } from "./types/misreport.js";
 
+export type {
+  FilterSettings,
+  FilterSettingsV1,
+  GameContext,
+} from "./types/settings.js";
+
 export { ok, err } from "./types/api.js";
 
 export { SPOILER_VERBS, matchesSpoilerVerb } from "./spoilerContext.js";

@@ -1,8 +1,112 @@
 /**
- * 判定エンジンの公開型定義
+ * 判定エンジンの公開型定義。
  *
- * 詳細な型は P2-SETUP-02 で本格実装する。
- * このファイルは Phase 2 のスケルトンとして空のまま用意している。
+ * 設計方針:
+ * - `Message` / `Judgment` / `JudgmentLabel` / `JudgmentContext` / `Stage2Transport`
+ *   は判定エンジン固有の型としてここに定義する。
+ * - `FilterSettings` / `GameContext` は `@fresh-chat-keeper/shared` で定義され、
+ *   設定マイグレーション関数（settings-migration.ts）と同じパッケージに置かれる。
+ *   judgment-engine からは type-only で import するのみ（再エクスポートしない）。
+ * - プロキシAPI契約（{@link JudgeRequestPayload} / {@link JudgeResponsePayload}）は
+ *   shared の {@link JudgeRequest} / {@link JudgeResponse} のエイリアスとし、
+ *   契約変更時は shared 側だけ更新すれば追従できるようにする。
  */
 
-export {};
+import type {
+  JudgeRequest,
+  JudgeResponse,
+  FilterSettings,
+  GameContext,
+} from '@fresh-chat-keeper/shared';
+
+/**
+ * 判定ラベル。1メッセージにつき複数のラベルが付与されうる（マルチラベル）。
+ *
+ * Phase 2 時点では `'safe' | 'spoiler'` のみ。
+ *
+ * @todo Phase 3: `'harassment' | 'spam' | 'off_topic' | 'backseat'` を追加し、
+ *   暴言・スパム・話題逸脱・指示厨の判定を統合する
+ */
+export type JudgmentLabel = 'safe' | 'spoiler';
+
+/**
+ * 判定エンジンに入力するチャットメッセージの正規化表現。
+ *
+ * YouTube DOM 由来の {@link import('@fresh-chat-keeper/shared').ChatMessage}
+ * とは別物。呼び出し側（chrome-ext / apps/api）で変換する責務を持つ。
+ */
+export interface Message {
+  /** メッセージID（プラットフォーム固有のもので可、ユニークであればよい） */
+  id: string;
+  /** メッセージ本文 */
+  text: string;
+  /** 投稿者のチャンネルID（YouTube channelId 等） */
+  authorChannelId: string;
+  /** 投稿者の表示名 */
+  authorDisplayName: string;
+  /** 投稿時刻（Unix ms）。アーカイブの場合は動画内オフセットを Unix ms に正規化したもの */
+  timestamp: number;
+}
+
+/**
+ * 1回の判定リクエストにおけるコンテキスト。
+ *
+ * - `game`: プレイ中のゲーム情報。未指定時はジャンルテンプレートのみで判定
+ * - `settings`: ユーザーのフィルタ設定（v2形式）
+ */
+export interface JudgmentContext {
+  /** ゲーム進行コンテキスト */
+  game?: GameContext;
+  /** ユーザー設定（v2スキーマ） */
+  settings: FilterSettings;
+}
+
+/**
+ * 判定結果。マルチラベル対応のため `labels[]` と `primary` を持つ。
+ */
+export interface Judgment {
+  /** 対象メッセージのID（{@link Message.id} と一致） */
+  messageId: string;
+  /** 付与されたラベル一覧。空配列ではなく必ず1件以上含まれる */
+  labels: JudgmentLabel[];
+  /** UI表示等に使う主要ラベル。`labels` のうち最も支配的なもの */
+  primary: JudgmentLabel;
+  /** 信頼度（0.0〜1.0）。Stage 1 の確定的判定では 1.0 */
+  confidence: number;
+  /** 判定が確定したステージ */
+  stage: 'stage1' | 'stage2';
+  /** 日本語の理由説明（UI表示用、デバッグ用）。任意 */
+  reasonJa?: string;
+  /** キャッシュからの応答かどうか */
+  fromCache: boolean;
+}
+
+/**
+ * Stage 2（LLM判定）への通信を抽象化するTransport。
+ *
+ * 判定エンジンは実際の通信方法を知らない:
+ * - Chrome拡張: `chrome.runtime.sendMessage` でService Workerに転送する実装を注入
+ * - Cloudflare Workers: `fetch` で直接プロキシ/Anthropic APIを叩く実装を注入
+ * - テスト: モック実装を注入して通信なしに判定ロジックを検証
+ */
+export interface Stage2Transport {
+  /**
+   * Stage 2 の判定リクエストをプロキシ/APIへ送信する。
+   *
+   * @param payload バッチ判定対象のメッセージ群と関連コンテキスト
+   * @returns 各メッセージに対する判定結果
+   */
+  sendJudgeRequest(payload: JudgeRequestPayload): Promise<JudgeResponsePayload>;
+}
+
+/**
+ * Stage 2 リクエストペイロード。
+ * shared の {@link JudgeRequest} のエイリアス（プロキシAPI契約と同一）。
+ */
+export type JudgeRequestPayload = JudgeRequest;
+
+/**
+ * Stage 2 レスポンスペイロード。
+ * shared の {@link JudgeResponse} のエイリアス（プロキシAPI契約と同一）。
+ */
+export type JudgeResponsePayload = JudgeResponse;

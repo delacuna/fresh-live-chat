@@ -5,10 +5,18 @@
  * Chrome拡張・Cloudflare Workers・Node.js から共通利用するため、
  * DOM API や chrome.* 等の環境固有APIには依存しない。
  *
- * 公開APIは後続タスクで段階的に追加する:
- *   - P2-SETUP-02: 型定義（Message, Judgment, JudgmentContext, ...）
- *   - P2-STAGE1-02: Stage 1 実装
+ * 公開関数は後続タスクで段階的に追加する:
+ *   - P2-STAGE1-02: `runStage1` / `judgeStage1Only`
  *   - P2-STAGE2-01: Stage 2 実装
+ *   - P2-CACHE-01: `createCache`
  */
 
-export * from './types.js';
+export type {
+  JudgmentLabel,
+  Message,
+  Judgment,
+  JudgmentContext,
+  Stage2Transport,
+  JudgeRequestPayload,
+  JudgeResponsePayload,
+} from './types.js';
