@@ -31,6 +31,14 @@ export default defineConfig({
         replacement: resolve(__dirname, '../../packages/knowledge-base/src/index.ts'),
       },
       {
+        find: '@fresh-chat-keeper/judgment-engine/stage1',
+        replacement: resolve(__dirname, '../../packages/judgment-engine/src/stage1/index.ts'),
+      },
+      {
+        find: '@fresh-chat-keeper/judgment-engine',
+        replacement: resolve(__dirname, '../../packages/judgment-engine/src/index.ts'),
+      },
+      {
         find: '@kb-data',
         replacement: resolve(__dirname, '../../packages/knowledge-base/data'),
       },

@@ -11,11 +11,20 @@
  * - Stage 2: プロキシ経由 LLM 判定（非同期、判定中は通常表示を維持）
  */
 
-import { buildKeywordSet, buildDescriptionPhraseSet, matchesKeyword, matchesKeywordForStage2, matchesCustomNGWord, buildActiveGenreTemplates, matchesGenreTemplate, matchesGenreKeywordForStage2, matchesGameplayHintForStage2 } from './filter.js';
+import {
+  buildKeywordSet,
+  buildDescriptionPhraseSet,
+  matchesKeyword,
+  matchesKeywordForStage2,
+  matchesCustomNGWord,
+  buildActiveGenreTemplates,
+  matchesGenreTemplate,
+  matchesGenreKeywordForStage2,
+  matchesGameplayHintForStage2,
+} from '@fresh-chat-keeper/judgment-engine/stage1';
 import type { GenreTemplate } from '@fresh-chat-keeper/knowledge-base';
 import { filterMessageElement, restoreMessageElement, switchDisplayMode, ATTR_FALSE_POSITIVE } from './chat-dom.js';
 import {
-  loadSettings,
   STORAGE_KEY,
   FILTER_COUNT_KEY,
   getOrCreateAnonToken,
@@ -25,16 +34,17 @@ import {
   saveMisreport,
   type Settings,
 } from '../shared/settings.js';
+import { loadSettings } from '../shared/settings-loader.js';
 import type { MisreportEntry } from '@fresh-chat-keeper/shared';
 import {
   initStage2Cache,
   getCachedVerdict,
   buildStage2CacheKey,
-  sendStage2Batch,
   verdictFromCache,
   type Stage2Candidate,
   type JudgeCacheEntry,
-} from './stage2.js';
+} from './chrome-cache.js';
+import { sendStage2Batch } from './filter-orchestrator.js';
 
 /** YouTube チャットリプレイのメッセージコンテナ */
 const ITEMS_SELECTOR = '#items';

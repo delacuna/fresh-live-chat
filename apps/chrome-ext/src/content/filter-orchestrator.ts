@@ -1,0 +1,184 @@
+/**
+ * Stage 2 オーケストレーション（Chrome 拡張側）。
+ *
+ * 旧 `stage2.ts` の `sendStage2Batch` 相当を judgment-engine 経由に切り替えた版。
+ *
+ * 主な変更点:
+ * - proxy リクエストを **新形式（`context` + `tier`）** で送信する
+ *   （旧形式は P2-PROXY-01 で proxy 側が後方互換でサポート済み、新拡張は新形式を使う）
+ * - LLM 通信は {@link createChromeTransport} 経由に抽象化（fetch のラッパー）
+ * - キャッシュは `chrome-cache.ts`（既存仕様 fck_judge_cache）を維持
+ *
+ * archive.ts からは `sendStage2Batch(batch, settings, token, onResult, videoTitle)` で
+ * 呼ばれる。signature は旧 stage2.ts と同じ（archive.ts 側の変更は import 先の
+ * 切り替えのみ）。
+ */
+
+import type { Settings, GameProgress } from '../shared/settings.js';
+import type { JudgeRequestPayload, JudgmentContext } from '@fresh-chat-keeper/judgment-engine';
+import type { FilterSettings, GameContext } from '@fresh-chat-keeper/shared';
+import { createChromeTransport } from './chrome-transport.js';
+import {
+  parseSpoilerCategory,
+  saveJudgeCacheEntry,
+  verdictFromCache,
+  type JudgeCacheEntry,
+  type OnStage2Result,
+  type Stage2Candidate,
+} from './chrome-cache.js';
+
+/**
+ * バッチ（最大5件）をプロキシに送信し、結果を onResult コールバックで返す。
+ *
+ * - ネットワークエラー・プロキシ停止時はコールバックを呼ばずに終了する
+ *   （Stage 1 を通過した候補なので、フィルタしない方が安全）
+ * - LLM 判定失敗時の verdict は verdictFromCache が filterMode に応じて決定する
+ *
+ * @returns プロキシへの HTTP リクエストが成功した場合 true、失敗した場合 false。
+ *          呼び出し元はこの戻り値に応じて利用量カウントをインクリメントする。
+ */
+export async function sendStage2Batch(
+  batch: Stage2Candidate[],
+  settings: Settings,
+  token: string,
+  onResult: OnStage2Result,
+  videoTitle?: string,
+): Promise<boolean> {
+  if (batch.length === 0) return true;
+
+  const transport = createChromeTransport(settings.proxyUrl, token);
+  const payload = buildJudgeRequestPayload(batch, settings, videoTitle);
+
+  let response;
+  try {
+    response = await transport.sendJudgeRequest(payload);
+  } catch (err) {
+    console.error(
+      `[FreshChatKeeper] Stage 2エラー: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    return false;
+  }
+
+  for (const result of response.results) {
+    const idx = parseInt(result.messageId, 10);
+    const candidate = batch[idx];
+    if (!candidate) continue;
+
+    const spoilerCategory = parseSpoilerCategory(result.spoilerCategory);
+    const entry: JudgeCacheEntry = {
+      spoilerCategory,
+      ...(result.confidence !== undefined ? { confidence: result.confidence } : {}),
+    };
+
+    // verdictFromCache は archive.ts 側でも適用されるが、ここではキャッシュへの
+    // 保存だけが目的（verdict 計算はコールバック先に委譲）
+    void verdictFromCache; // tree-shaking 用の参照（未使用警告対策）
+    await saveJudgeCacheEntry(candidate.cacheKey, entry);
+    onResult(candidate, entry);
+  }
+
+  return true;
+}
+
+// ─── ペイロード構築（新形式: context + tier）─────────────────────────────────
+
+function buildJudgeRequestPayload(
+  batch: Stage2Candidate[],
+  settings: Settings,
+  videoTitle: string | undefined,
+): JudgeRequestPayload {
+  const context = buildJudgmentContext(settings, videoTitle);
+  return {
+    messages: batch.map((c, i) => ({ id: String(i), text: c.text })),
+    context: {
+      game: context.game,
+      settings: context.settings,
+    },
+    tier: 'free',
+  } as JudgeRequestPayload;
+}
+
+/**
+ * 既存 chrome-ext の {@link Settings} を judgment-engine の
+ * {@link JudgmentContext}（ゲーム + v2 設定）に変換する。
+ *
+ * 既存 chrome-ext の保存形式は v0.2.0 から変更しない方針のため、
+ * proxy / judgment-engine に渡す段階でのみ v2 形式に変換する。
+ */
+function buildJudgmentContext(settings: Settings, videoTitle: string | undefined): JudgmentContext {
+  const isKBGame = settings.gameId !== 'none' && settings.gameId !== 'other';
+  const game = buildGameContext(settings, isKBGame, videoTitle);
+
+  const filterSettings: FilterSettings = {
+    version: 2,
+    enabled: settings.enabled,
+    displayMode: settings.displayMode,
+    filterMode: 'archive', // v2 の filterMode は archive/live。既存 chrome-ext には対応情報なし → archive 既定
+    categories: {
+      spoiler: {
+        enabled: true,
+        strength: legacyFilterModeToStrength(settings.filterMode),
+      },
+    },
+    customBlockWords: settings.customNgWords
+      .filter((w) => w.enabled)
+      .map((w) => w.word),
+    userTier: 'free',
+    ...(game ? { gameContext: game } : {}),
+  };
+
+  return { settings: filterSettings, ...(game ? { game } : {}) };
+}
+
+function buildGameContext(
+  settings: Settings,
+  isKBGame: boolean,
+  videoTitle: string | undefined,
+): GameContext | undefined {
+  const selected = settings.selectedGenreTemplates ?? [];
+  if (!isKBGame && selected.length === 0 && !videoTitle) return undefined;
+
+  const progress: GameProgress | undefined = isKBGame
+    ? settings.progressByGame[settings.gameId]
+    : undefined;
+
+  let progressType: 'chapter' | 'event' | 'none' = 'none';
+  let currentChapter: string | undefined;
+  let completedEvents: string[] | undefined;
+  if (progress?.progressModel === 'chapter' && progress.currentChapterId) {
+    progressType = 'chapter';
+    currentChapter = progress.currentChapterId;
+  } else if (progress?.progressModel === 'event' && progress.completedEventIds) {
+    progressType = 'event';
+    completedEvents = progress.completedEventIds;
+  }
+
+  // 複数ジャンル併記は単一フィールド `genreTemplate` に詰められない。
+  // proxy が新形式リクエストの genreTemplate を 1 件として扱う前提で、
+  // 最初のテンプレート ID を採用する（旧形式の selectedGenreTemplates 配列形式は
+  // proxy の P2-PROXY-01 後方互換ロジック側で複数併記を扱うが、新形式は単一）。
+  const genreTemplate = selected.length > 0 ? selected[0] : undefined;
+
+  return {
+    ...(isKBGame ? { gameId: settings.gameId } : {}),
+    ...(videoTitle ? { gameTitle: videoTitle } : {}),
+    progressType,
+    ...(currentChapter ? { currentChapter } : {}),
+    ...(completedEvents ? { completedEvents } : {}),
+    ...(genreTemplate ? { genreTemplate } : {}),
+  };
+}
+
+function legacyFilterModeToStrength(
+  mode: 'strict' | 'standard' | 'lenient' | 'off',
+): 'loose' | 'standard' | 'strict' {
+  switch (mode) {
+    case 'lenient':
+      return 'loose';
+    case 'strict':
+      return 'strict';
+    case 'standard':
+    case 'off':
+      return 'standard';
+  }
+}
