@@ -27,6 +27,8 @@ export interface FilterResult {
   spoilerCategory?: "direct_spoiler" | "foreshadowing_hint" | "gameplay_hint" | "safe";
   /** 信頼スコア（0–1） */
   confidence?: number;
+  /** Stage 2 LLM の判定理由（日本語、UI/デバッグ用） */
+  reason?: string;
   /** 処理ステージ（1 = キーワード/ベクトル, 2 = LLM） */
   stage: 1 | 2;
 }

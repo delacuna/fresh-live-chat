@@ -12,6 +12,7 @@
 import type { Judgment, JudgmentContext } from '../types.js';
 import { normalizeText } from '../utils/normalize.js';
 import { hashString } from '../utils/hash.js';
+import { getProgressSignature } from '../utils/progress-signature.js';
 
 /** キャッシュ1エントリの値 */
 export interface CacheEntry {
@@ -106,23 +107,6 @@ export class JudgmentCache {
   private isExpired(entry: CacheEntry): boolean {
     if (this.options.ttlMs === undefined) return false;
     return Date.now() - entry.cachedAt > this.options.ttlMs;
-  }
-}
-
-/**
- * `GameContext` から進行状況のシグネチャ文字列を生成する。
- * 進行状況の差分でキャッシュを分けるため、JSON にシリアライズしやすい形に正規化する。
- */
-function getProgressSignature(game: JudgmentContext['game']): string {
-  if (!game) return '-';
-  switch (game.progressType) {
-    case 'chapter':
-      return `c:${game.currentChapter ?? ''}`;
-    case 'event':
-      // イベント順序の差はキャッシュ的に意味があるため sort 前に保存する
-      return `e:${(game.completedEvents ?? []).slice().sort().join(',')}`;
-    case 'none':
-      return 'n';
   }
 }
 

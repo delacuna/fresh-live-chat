@@ -30,6 +30,8 @@ export type {
   GameContext,
 } from "./types/settings.js";
 
+export { migrateSettings } from "./settings-migration.js";
+
 export { ok, err } from "./types/api.js";
 
 export { SPOILER_VERBS, matchesSpoilerVerb } from "./spoilerContext.js";

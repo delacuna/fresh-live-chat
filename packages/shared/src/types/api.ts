@@ -18,6 +18,11 @@ export interface JudgeRequest {
   selectedGenreTemplates?: string[];
   /** YouTubeの動画タイトル（ゲーム自動推測に使用） */
   videoTitle?: string;
+  /**
+   * ユーザーティア。Phase 2 では optional（未指定時は 'free' 扱い）。
+   * Phase 3 以降でモデルルーターがティア別判定を行うため、新クライアントは送信すべき。
+   */
+  tier?: 'free' | 'premium' | 'streamer';
 }
 
 /**

@@ -41,3 +41,9 @@ export { JudgmentCache, createMemoryStorage } from './stage2/cache.js';
 
 export type { MockTransportHandler } from './stage2/api-client.js';
 export { createMockTransport, createFailingTransport } from './stage2/api-client.js';
+
+export type { SystemPromptBlock, BuildSystemPromptOptions } from './stage2/prompt-builder.js';
+export { buildSystemPrompt, buildUserPrompt } from './stage2/prompt-builder.js';
+
+export type { Stage2BatcherOptions } from './stage2/batcher.js';
+export { Stage2Batcher } from './stage2/batcher.js';
