@@ -17,6 +17,7 @@
 import type { Settings, GameProgress } from '../shared/settings.js';
 import type { JudgeRequestPayload, JudgmentContext } from '@fresh-chat-keeper/judgment-engine';
 import type { FilterSettings, GameContext } from '@fresh-chat-keeper/shared';
+import { getAllGenreTemplates } from '@fresh-chat-keeper/knowledge-base';
 import { createChromeTransport } from './chrome-transport.js';
 import {
   parseSpoilerCategory,
@@ -153,11 +154,13 @@ function buildGameContext(
     completedEvents = progress.completedEventIds;
   }
 
-  // 複数ジャンル併記は単一フィールド `genreTemplate` に詰められない。
-  // proxy が新形式リクエストの genreTemplate を 1 件として扱う前提で、
-  // 最初のテンプレート ID を採用する（旧形式の selectedGenreTemplates 配列形式は
-  // proxy の P2-PROXY-01 後方互換ロジック側で複数併記を扱うが、新形式は単一）。
-  const genreTemplate = selected.length > 0 ? selected[0] : undefined;
+  // 複数ジャンル併記対応: judgment-engine の GameContext.genreTemplate は単一文字列だが、
+  // chrome-ext の UI（popup/App.tsx の GenreTemplateSection）は複数選択可能。
+  // 既存挙動（v0.2.0 で proxy 側が複数併記を扱う）と同等の判定精度を維持するため、
+  // ここで日本語表示名を `・` で結合した文字列を詰める。proxy 側の prompt-builder の
+  // resolveGenreName が ID 解決失敗時に文字列をそのまま name として扱う仕様を活用
+  // （proxy の buildGenreTemplateField と同じロジック）。
+  const genreTemplate = buildGenreTemplateField(selected);
 
   return {
     ...(isKBGame ? { gameId: settings.gameId } : {}),
@@ -167,6 +170,14 @@ function buildGameContext(
     ...(completedEvents ? { completedEvents } : {}),
     ...(genreTemplate ? { genreTemplate } : {}),
   };
+}
+
+function buildGenreTemplateField(selectedIds: string[]): string | undefined {
+  if (selectedIds.length === 0) return undefined;
+  if (selectedIds.length === 1) return selectedIds[0];
+  // 複数選択時: 表示名を解決して `・` で結合
+  const all = getAllGenreTemplates();
+  return selectedIds.map((id) => all.find((t) => t.id === id)?.name ?? id).join('・');
 }
 
 function legacyFilterModeToStrength(
