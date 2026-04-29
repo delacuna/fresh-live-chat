@@ -12,6 +12,7 @@ import {
   type Stage2Usage,
   type CustomNGWord,
 } from '../shared/settings.js';
+import { saveSettings } from '../shared/settings-loader.js';
 import type { KBGame } from '@fresh-chat-keeper/knowledge-base';
 import { getAllGenreTemplates } from '@fresh-chat-keeper/knowledge-base';
 import aceAttorney1 from '@kb-data/ace-attorney-1.json';
@@ -318,7 +319,8 @@ export default function App() {
   const update = (partial: Partial<Settings>) => {
     const next = { ...settings, ...partial };
     setSettings(next);
-    chrome.storage.local.set({ [STORAGE_KEY]: next });
+    // saveSettings が version: 2 を確実に付与する（直接 set すると剥がれる）
+    void saveSettings(next);
   };
 
   const activeGame = GAMES.find((g) => g.id === settings.gameId) ?? GAMES[0];

@@ -162,11 +162,6 @@ export function getBlockedLevels(mode: FilterMode): string[] {
   }
 }
 
-/** chrome.storage.local に設定を保存する */
-export async function saveSettings(settings: Settings): Promise<void> {
-  await chrome.storage.local.set({ [STORAGE_KEY]: settings });
-}
-
 /**
  * 匿名トークンを取得する。まだ存在しない場合は UUID を生成して保存する。
  * リクエストヘッダー x-fck-token に使用する。

@@ -33,7 +33,7 @@ export const SETTINGS_V1_BACKUP_KEY = 'fck_settings_v1_backup';
  * 拡張内部で扱う Settings に version フィールドを付与した型。
  * chrome.storage 上の保存表現でのみ使用する（読み出し後はトップレベルから version を除いた {@link Settings} に統一）。
  */
-type StoredSettingsV2 = Settings & { version: 2 };
+export type StoredSettingsV2 = Settings & { version: 2 };
 
 /**
  * chrome.storage.local から設定を読み込む。
@@ -74,6 +74,19 @@ function stripVersion(raw: StoredSettingsV2): Settings {
   const { version: _ignore, ...rest } = raw;
   void _ignore;
   return { ...DEFAULT_SETTINGS, ...rest };
+}
+
+/**
+ * chrome.storage.local に設定を保存する。常に `version: 2` を付与するため、
+ * 書き込み後の値は再度 {@link loadSettings} が v2 として認識する（v1 へ戻らない）。
+ *
+ * 直接 `chrome.storage.local.set({ [STORAGE_KEY]: ... })` を呼ぶと version
+ * フィールドが剥がれてマイグレーションが繰り返し実行されるため、すべての
+ * 設定保存はこの関数を経由する必要がある。
+ */
+export async function saveSettings(settings: Settings): Promise<void> {
+  const stored: StoredSettingsV2 = { ...settings, version: 2 };
+  await chrome.storage.local.set({ [STORAGE_KEY]: stored });
 }
 
 async function migrateLegacyToV2(raw: unknown): Promise<Settings> {
