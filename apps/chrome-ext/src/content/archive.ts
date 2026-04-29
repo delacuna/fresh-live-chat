@@ -286,10 +286,24 @@ function observeItems(itemsContainer: Element): void {
 /**
  * 既存の全フィルタを解除して再フィルタする。
  * Observer を一時停止して干渉を防ぐ。
+ *
+ * @param clearReveals フィルタ基準が変わった場合は true（デフォルト）。
+ *   ユーザーがクリックして展開済みのテキスト集合 ({@link revealedTexts}) を
+ *   クリアし、新基準での再判定を確実に走らせる。
+ *   displayMode 等「フィルタ基準が変わらない」変更の場合は false を渡して
+ *   展開状態を維持する（ただし現状そのケースでは reprocessAll は呼ばれない）。
  */
-function reprocessAll(itemsContainer: Element): void {
+function reprocessAll(itemsContainer: Element, clearReveals = true): void {
   isUpdatingDisplayMode = true;
   pauseObserver();
+
+  // フィルタ基準が変わった場合、展開済みテキストの集合は古い基準に対する
+  // ユーザーの意思表明であり、新基準では無効化して再判定する必要がある。
+  // クリアしないと processMessage の `if (revealedTexts.has(text)) return;`
+  // で早期 return してしまい、再フィルタが走らない。
+  if (clearReveals) {
+    revealedTexts.clear();
+  }
 
   itemsContainer.querySelectorAll(FILTERED_SELECTOR).forEach((el) => {
     restoreMessageElement(el);
