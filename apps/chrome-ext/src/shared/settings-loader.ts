@@ -30,6 +30,42 @@ import {
 export const SETTINGS_V1_BACKUP_KEY = 'fck_settings_v1_backup';
 
 /**
+ * 旧名拡張時代に使用していた `flc_*` プレフィックスキー。
+ * 名称変更（"Fresh Live Chat" → "Fresh Chat Keeper"）以降、現コードは
+ * すべて `fck_*` プレフィックスのみを使用するため、これらは orphan データ。
+ *
+ * `cleanupLegacyPrefixKeys()` で chrome.storage.local から削除する。
+ */
+const LEGACY_PREFIX_KEYS = [
+  'flc_anon_token',
+  'flc_filter_count',
+  'flc_judge_cache',
+  'flc_settings',
+  'flc_stage2_usage',
+] as const;
+
+/**
+ * 旧名拡張時代の `flc_*` プレフィックスキーを chrome.storage.local から削除する。
+ *
+ * - 該当キーが1つも存在しなければ no-op（早期リターン）
+ * - 存在する場合は一括削除し、件数をログ出力
+ * - 拡張起動ごとの重複実行を避けるため、background service worker 側の
+ *   `onInstalled` / `onStartup` から呼び出すこと（content/popup からは呼ばない）
+ *
+ * @returns 削除したキーの件数（0 の場合は no-op）
+ */
+export async function cleanupLegacyPrefixKeys(): Promise<number> {
+  const found = await chrome.storage.local.get([...LEGACY_PREFIX_KEYS]);
+  const existingKeys = LEGACY_PREFIX_KEYS.filter((k) => k in found);
+  if (existingKeys.length === 0) return 0;
+  await chrome.storage.local.remove(existingKeys);
+  console.log(
+    `[FreshChatKeeper] Cleaned up ${existingKeys.length} legacy flc_* keys: ${existingKeys.join(', ')}`,
+  );
+  return existingKeys.length;
+}
+
+/**
  * 拡張内部で扱う Settings に version フィールドを付与した型。
  * chrome.storage 上の保存表現でのみ使用する（読み出し後はトップレベルから version を除いた {@link Settings} に統一）。
  */
