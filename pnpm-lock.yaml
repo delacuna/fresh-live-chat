@@ -65,6 +65,16 @@ importers:
         version: 5.4.21
 
   apps/proxy:
+    dependencies:
+      '@fresh-chat-keeper/judgment-engine':
+        specifier: workspace:*
+        version: link:../../packages/judgment-engine
+      '@fresh-chat-keeper/knowledge-base':
+        specifier: workspace:*
+        version: link:../../packages/knowledge-base
+      '@fresh-chat-keeper/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
     devDependencies:
       '@cloudflare/workers-types':
         specifier: ^4.20240725.0
@@ -72,6 +82,9 @@ importers:
       typescript:
         specifier: ^5.5.0
         version: 5.9.3
+      vitest:
+        specifier: ^2.0.0
+        version: 2.1.9
       wrangler:
         specifier: ^3.60.0
         version: 3.114.17(@cloudflare/workers-types@4.20260410.1)

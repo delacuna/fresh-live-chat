@@ -8,63 +8,95 @@
  *
  * エンドポイント:
  *   POST /api/judge — Stage 2 LLM 判定
+ *
+ * Phase 2 (P2-PROXY-01) からの変更点:
+ * - **後方互換**: 既存 v0.2.0 拡張が送る旧リクエスト形式（`gameId`/`progress`/
+ *   `filterMode`/`selectedGenreTemplates` トップレベル）と、v0.3.0 拡張が送る
+ *   新形式（`context.game`/`context.settings`/`tier`）の両方を受け付ける
+ * - judgment-engine の `buildSystemPrompt` / `buildUserPrompt` を使い、
+ *   N メッセージを1回の Anthropic API 呼び出しでバッチ判定
+ *   （プロンプトキャッシング有効、レイテンシ・コスト改善）
+ * - ジャンル名解決は judgment-engine から `getAllGenreTemplates()` で行う
+ *   （旧 `GENRE_NAMES` ハードコード辞書は削除）
  */
+
+import type {
+  JudgeResponse,
+  FilterResult,
+  FilterSettings,
+  GameContext,
+  UserProgress,
+} from '@fresh-chat-keeper/shared';
+import {
+  buildSystemPrompt,
+  buildUserPrompt,
+  getEffectiveModel,
+  type ModelTier,
+  type Message as JudgmentMessage,
+  type JudgmentContext,
+} from '@fresh-chat-keeper/judgment-engine';
+import { getAllGenreTemplates } from '@fresh-chat-keeper/knowledge-base';
 
 export interface Env {
   ANTHROPIC_API_KEY: string;
   RATE_LIMIT_KV: KVNamespace;
 }
 
-// ─── 型定義（packages/shared の JudgeRequest / JudgeResponse と互換） ─────────
+// ─── 型定義 ──────────────────────────────────────────────────────────────────
 
 type SpoilerCategory = 'direct_spoiler' | 'foreshadowing_hint' | 'gameplay_hint' | 'safe';
 type FilterVerdict = 'block' | 'allow' | 'uncertain';
-type FilterMode = 'strict' | 'standard' | 'lenient';
 
-interface UserProgress {
-  gameId: string;
-  progressModel: 'chapter' | 'event';
-  currentChapterId?: string;
-  completedEventIds?: string[];
-}
+/**
+ * 旧 FilterMode の値域。shared の `FilterMode` と互換だが、proxy が実際に
+ * 受け取る範囲を厳格化（string ではなく union）して使う。
+ */
+type LegacyFilterMode = 'strict' | 'standard' | 'lenient' | 'off';
 
-interface JudgeRequest {
+/**
+ * v0.2.0 拡張が送る旧形式リクエスト。
+ *
+ * shared の `JudgeRequest` 型は `filterMode: string` などの緩い型を持ち、また
+ * `genre` ショートハンドフィールドが含まれていないため、proxy 内部で
+ * 厳格化した型を定義して扱う。
+ */
+interface LegacyJudgeRequest {
   messages: Array<{ id: string; text: string }>;
-  /** ゲームKB使用時に指定。ジャンルテンプレートのみの場合は null 可 */
   gameId?: string | null;
-  /** ゲームKB使用時に指定。ジャンルテンプレートのみの場合は null 可 */
   progress?: UserProgress | null;
-  /** フィルタモード（省略時は 'standard'） */
-  filterMode?: FilterMode;
-  /** 有効化されているジャンルテンプレートのIDリスト */
+  filterMode?: LegacyFilterMode;
   selectedGenreTemplates?: string[];
   /** selectedGenreTemplates の単一ジャンル版ショートハンド（テスト・外部クライアント用） */
   genre?: string;
-  /** YouTubeの動画タイトル（ゲーム自動推測に使用） */
   videoTitle?: string;
+  tier?: ModelTier;
 }
 
-interface FilterResult {
-  messageId: string;
-  verdict: FilterVerdict;
-  spoilerCategory?: SpoilerCategory;
-  confidence?: number;
-  reason?: string;
-  stage: 2;
+/**
+ * v0.3.0 拡張が送る新形式リクエスト。
+ * judgment-engine の {@link JudgmentContext} をそのまま `context` として保持し、
+ * モデル選択用の `tier` を別フィールドで送る。
+ */
+interface NewJudgeRequest {
+  messages: Array<{ id: string; text: string }>;
+  context: {
+    game?: GameContext;
+    settings: FilterSettings;
+  };
+  tier?: ModelTier;
 }
 
-interface JudgeResponse {
-  results: FilterResult[];
+/** 旧形式・新形式どちらも統一表現に変換した内部リクエスト */
+interface NormalizedRequest {
+  messages: Array<{ id: string; text: string }>;
+  context: JudgmentContext;
+  tier: ModelTier;
+  /**
+   * verdict 計算（lenient/standard/strict ベース）に使う旧 FilterMode 値。
+   * judgment-engine の `categories.spoiler.strength` と互換。
+   */
+  legacyFilterMode: LegacyFilterMode;
 }
-
-// ─── ジャンルテンプレート名マッピング ─────────────────────────────────────────
-
-const GENRE_NAMES: Record<string, string> = {
-  'rpg':           'RPG',
-  'mystery':       '推理・ミステリー',
-  'action-horror': 'アクション・ホラー',
-  'story-general': 'ストーリー全般',
-};
 
 // ─── レート制限設定 ───────────────────────────────────────────────────────────
 
@@ -114,42 +146,267 @@ async function handleJudge(request: Request, env: Env): Promise<Response> {
   }
 
   // リクエストボディのパース
-  let body: JudgeRequest;
+  let body: unknown;
   try {
-    body = await request.json() as JudgeRequest;
+    body = await request.json();
   } catch {
     return jsonError('Invalid JSON body', 400);
   }
 
-  if (!Array.isArray(body.messages) || body.messages.length === 0) {
+  if (typeof body !== 'object' || body === null) {
+    return jsonError('Body must be a JSON object', 400);
+  }
+
+  const bodyObj = body as Record<string, unknown>;
+  const messages = bodyObj['messages'];
+  if (!Array.isArray(messages) || messages.length === 0) {
     return jsonError('messages must be a non-empty array', 400);
   }
 
-  // genre（文字列）は selectedGenreTemplates（配列）のショートハンドとして正規化
-  const effectiveGenreTemplates = normalizeGenreTemplates(body);
-
-  // gameId または genre/selectedGenreTemplates のいずれかが必要
-  if (!body.gameId && effectiveGenreTemplates.length === 0) {
-    return jsonError('gameId or genre/selectedGenreTemplates is required', 400);
+  // 旧形式は gameId or genre/selectedGenreTemplates が必須（新形式は context があれば OK）
+  if (!isNewFormat(bodyObj)) {
+    const legacy = bodyObj as unknown as LegacyJudgeRequest;
+    const hasGenre =
+      (legacy.selectedGenreTemplates && legacy.selectedGenreTemplates.length > 0) || !!legacy.genre;
+    if (!legacy.gameId && !hasGenre && !legacy.videoTitle) {
+      return jsonError('gameId or genre/selectedGenreTemplates is required (legacy format)', 400);
+    }
   }
 
-  const filterMode: FilterMode = body.filterMode ?? 'standard';
-
-  // 各メッセージを並列で LLM 判定（最大同時5件）
-  const chunks = chunkArray(body.messages, 5);
-  const results: FilterResult[] = [];
-  for (const chunk of chunks) {
-    const chunkResults = await Promise.all(
-      chunk.map((msg) => judgeMessage(msg, body.gameId, body.progress, filterMode, effectiveGenreTemplates, body.videoTitle, env.ANTHROPIC_API_KEY)),
-    );
-    results.push(...chunkResults);
-  }
+  const normalized = normalizeRequest(bodyObj);
+  const results = await judgeBatch(normalized, env.ANTHROPIC_API_KEY);
 
   const response: JudgeResponse = { results };
   return jsonOk(response);
 }
 
-// ─── レート制限 ───────────────────────────────────────────────────────────────
+// ─── リクエスト正規化（旧/新両形式対応）─────────────────────────────────────
+
+function isNewFormat(body: Record<string, unknown>): boolean {
+  return 'context' in body && typeof body['context'] === 'object' && body['context'] !== null;
+}
+
+function normalizeRequest(body: Record<string, unknown>): NormalizedRequest {
+  if (isNewFormat(body)) {
+    const newReq = body as unknown as NewJudgeRequest;
+    const settings = newReq.context.settings;
+    return {
+      messages: newReq.messages,
+      context: { game: newReq.context.game, settings },
+      tier: newReq.tier ?? 'free',
+      legacyFilterMode: strengthToLegacyMode(settings.categories.spoiler.strength),
+    };
+  }
+
+  // 旧形式 → 統一表現
+  const legacy = body as unknown as LegacyJudgeRequest;
+  const filterMode: LegacyFilterMode = legacy.filterMode ?? 'standard';
+  const game = buildGameContextFromLegacy(legacy);
+  const settings: FilterSettings = {
+    version: 2,
+    enabled: true,
+    displayMode: 'placeholder',
+    filterMode: 'archive',
+    categories: { spoiler: { enabled: true, strength: legacyModeToStrength(filterMode) } },
+    customBlockWords: [],
+    userTier: legacy.tier ?? 'free',
+    ...(game ? { gameContext: game } : {}),
+  };
+  return {
+    messages: legacy.messages,
+    context: { game, settings },
+    tier: legacy.tier ?? 'free',
+    legacyFilterMode: filterMode,
+  };
+}
+
+function legacyModeToStrength(mode: LegacyFilterMode): 'loose' | 'standard' | 'strict' {
+  switch (mode) {
+    case 'lenient':
+      return 'loose';
+    case 'strict':
+      return 'strict';
+    case 'standard':
+    case 'off':
+    default:
+      return 'standard';
+  }
+}
+
+function strengthToLegacyMode(strength: 'loose' | 'standard' | 'strict'): LegacyFilterMode {
+  switch (strength) {
+    case 'loose':
+      return 'lenient';
+    case 'strict':
+      return 'strict';
+    case 'standard':
+    default:
+      return 'standard';
+  }
+}
+
+/**
+ * 旧 LegacyJudgeRequest から GameContext を組み立てる。
+ *
+ * 複数ジャンル併記（例: `selectedGenreTemplates: ['rpg', 'mystery']`）は、
+ * judgment-engine の `GameContext.genreTemplate`（単一文字列）に対応するため、
+ * 表示名（日本語）を `・` で結合した文字列を入れる。prompt-builder の
+ * `resolveGenreName` は ID 解決失敗時に文字列をそのまま使うため、結合された
+ * 表示名がそのままプロンプトに反映される。
+ */
+function buildGameContextFromLegacy(legacy: LegacyJudgeRequest): GameContext | undefined {
+  const selectedIds =
+    legacy.selectedGenreTemplates && legacy.selectedGenreTemplates.length > 0
+      ? legacy.selectedGenreTemplates
+      : legacy.genre
+        ? [legacy.genre]
+        : [];
+
+  if (!legacy.gameId && selectedIds.length === 0 && !legacy.videoTitle) {
+    return undefined;
+  }
+
+  const genreTemplate = buildGenreTemplateField(selectedIds);
+
+  let progressType: 'chapter' | 'event' | 'none' = 'none';
+  let currentChapter: string | undefined;
+  let completedEvents: string[] | undefined;
+  if (legacy.progress) {
+    progressType = legacy.progress.progressModel;
+    currentChapter = legacy.progress.currentChapterId;
+    completedEvents = legacy.progress.completedEventIds;
+  }
+
+  return {
+    ...(legacy.gameId ? { gameId: legacy.gameId } : {}),
+    ...(legacy.videoTitle ? { gameTitle: legacy.videoTitle } : {}),
+    progressType,
+    ...(currentChapter ? { currentChapter } : {}),
+    ...(completedEvents ? { completedEvents } : {}),
+    ...(genreTemplate ? { genreTemplate } : {}),
+  };
+}
+
+function buildGenreTemplateField(selectedIds: string[]): string | undefined {
+  if (selectedIds.length === 0) return undefined;
+  if (selectedIds.length === 1) return selectedIds[0];
+  // 複数併記: 表示名を解決して `・` で結合（prompt-builder が ID 解決失敗時に
+  // 文字列をそのまま name として扱うため、結合済み文字列がそのままプロンプトに乗る）
+  const all = getAllGenreTemplates();
+  return selectedIds.map((id) => all.find((t) => t.id === id)?.name ?? id).join('・');
+}
+
+// ─── バッチ LLM 判定 ───────────────────────────────────────────────────────────
+
+async function judgeBatch(
+  req: NormalizedRequest,
+  apiKey: string,
+): Promise<FilterResult[]> {
+  const modelCfg = getEffectiveModel(req.tier);
+
+  // judgment-engine の Message 型に合わせて変換（authorChannelId/authorDisplayName/timestamp は
+  // 判定には使われないので空値で OK。プロキシ経由のリクエストには元々これらが含まれない）
+  const judgmentMessages: JudgmentMessage[] = req.messages.map((m) => ({
+    id: m.id,
+    text: m.text,
+    authorChannelId: '',
+    authorDisplayName: '',
+    timestamp: 0,
+  }));
+
+  const systemBlocks = buildSystemPrompt(req.context, {
+    supportsCaching: modelCfg.supportsCaching,
+  });
+  const userPrompt = buildUserPrompt(judgmentMessages);
+
+  // バッチサイズに応じて max_tokens を増やす（modelCfg.maxTokens は単一メッセージ前提の200）
+  const maxTokens = Math.max(modelCfg.maxTokens, req.messages.length * 100);
+
+  const fallbackResults = (): FilterResult[] =>
+    req.messages.map((m) => ({
+      messageId: m.id,
+      verdict: uncertainVerdict(req.legacyFilterMode),
+      stage: 2,
+    }));
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: modelCfg.model,
+        max_tokens: maxTokens,
+        temperature: modelCfg.temperature,
+        system: systemBlocks,
+        messages: [{ role: 'user', content: userPrompt }],
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[FreshChatKeeper] Anthropic API error ${response.status}: ${errorText}`);
+      return fallbackResults();
+    }
+
+    const data = (await response.json()) as { content: Array<{ type: string; text: string }> };
+    const text = data.content[0]?.text ?? '';
+
+    // ```json ... ``` のような余分な記法にも対応するため、最初の `[` から最後の `]` までを抽出
+    const arrayMatch = text.match(/\[[\s\S]*\]/);
+    if (!arrayMatch) {
+      console.error('[FreshChatKeeper] Failed to extract JSON array from LLM response:', text);
+      return fallbackResults();
+    }
+
+    let judgments: Array<{
+      messageId: string;
+      spoiler_category: SpoilerCategory;
+      confidence: number;
+      reason: string;
+    }>;
+    try {
+      judgments = JSON.parse(arrayMatch[0]);
+    } catch (err) {
+      console.error('[FreshChatKeeper] JSON parse failed:', err);
+      return fallbackResults();
+    }
+
+    if (!Array.isArray(judgments)) {
+      console.error('[FreshChatKeeper] LLM response is not an array');
+      return fallbackResults();
+    }
+
+    const judgmentById = new Map(judgments.map((j) => [j.messageId, j]));
+
+    return req.messages.map((m) => {
+      const j = judgmentById.get(m.id);
+      if (!j) {
+        return {
+          messageId: m.id,
+          verdict: uncertainVerdict(req.legacyFilterMode),
+          stage: 2,
+        };
+      }
+      return {
+        messageId: m.id,
+        verdict: categoryToVerdict(j.spoiler_category, req.legacyFilterMode),
+        spoilerCategory: j.spoiler_category,
+        confidence: j.confidence,
+        reason: j.reason,
+        stage: 2,
+      };
+    });
+  } catch (err) {
+    console.error('[FreshChatKeeper] judgeBatch error:', err);
+    return fallbackResults();
+  }
+}
+
+// ─── ヘルパー ─────────────────────────────────────────────────────────────────
 
 async function checkRateLimit(ip: string, kv: KVNamespace): Promise<boolean> {
   const windowKey = Math.floor(Date.now() / (RATE_LIMIT_WINDOW_SECONDS * 1000));
@@ -166,169 +423,12 @@ async function checkRateLimit(ip: string, kv: KVNamespace): Promise<boolean> {
   return true;
 }
 
-// ─── LLM 判定 ─────────────────────────────────────────────────────────────────
-
-async function judgeMessage(
-  message: { id: string; text: string },
-  gameId: string | null | undefined,
-  progress: UserProgress | null | undefined,
-  filterMode: FilterMode,
-  selectedGenreTemplates: string[],
-  videoTitle: string | null | undefined,
-  apiKey: string,
-): Promise<FilterResult> {
-  const progressDescription = formatProgress(progress);
-  const contextDescription = buildContextDescription(gameId, progressDescription, selectedGenreTemplates, videoTitle ?? undefined);
-
-  const prompt = `あなたはゲームのライブ配信チャットのネタバレ判定AIです。
-${contextDescription}
-以下のチャットメッセージを判定してください。
-
-メッセージ: "${message.text}"
-
-判定基準（spoiler_category）:
-
-"direct_spoiler" — 明示的なネタバレ（重度）
-  現在の進行状況より先のストーリー展開、キャラクターの生死、真相、結末などを直接的に述べている。
-  例: 「○○は実は裏切り者だよ」「ラスボスは○○」
-
-"foreshadowing_hint" — 伏線の指摘・匂わせ（中度）
-  先の展開を知っている人が、初見を装いつつ特定の場面・台詞・キャラクターに注意を向けさせるコメント。
-  例: 「ここ覚えておいて」「今の会話重要だよ」「この人怪しいな...（意味深）」
-
-"gameplay_hint" — 攻略ヒント（軽度）
-  次に何をすべきか、どこに行くべきかなどの指示・アドバイス。ストーリーには触れないが、初見プレイヤーの自力発見・体験を損なう。善意のアドバイスも含む。
-  「負けイベ」「スルーでいい」「戦わなくていい」のようなゲームシステムに関する情報開示もこれに含む。
-  例: 「左の道に行った方がいいよ」「そのボスは炎属性が弱点」「弾使わないほうがいいよ」「ここ負けイベだよ」「アイテム見逃してるよ」「探索甘くない？」
-
-"safe" — 安全
-  既に通過した内容への言及、ゲームと無関係な会話、純粋な感想、配信者への応援。
-
-JSON形式のみで回答（余分なテキストを含めないこと）:
-{
-  "spoiler_category": "direct_spoiler" | "foreshadowing_hint" | "gameplay_hint" | "safe",
-  "confidence": 0.0-1.0,
-  "reason": "判定理由を簡潔に"
-}`;
-
-  try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 256,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[FreshChatKeeper] Anthropic API error ${response.status}: ${errorText}`);
-      return { messageId: message.id, verdict: uncertainVerdict(filterMode), stage: 2 };
-    }
-
-    const data = await response.json() as { content: Array<{ type: string; text: string }> };
-    const text = data.content[0]?.text ?? '';
-
-    // ```json ... ``` のような余分な記法にも対応
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      console.error('[FreshChatKeeper] Failed to extract JSON from LLM response:', text);
-      return { messageId: message.id, verdict: uncertainVerdict(filterMode), stage: 2 };
-    }
-
-    const judgment = JSON.parse(jsonMatch[0]) as {
-      spoiler_category: SpoilerCategory;
-      confidence: number;
-      reason: string;
-    };
-
-    return {
-      messageId: message.id,
-      verdict: categoryToVerdict(judgment.spoiler_category, filterMode),
-      spoilerCategory: judgment.spoiler_category,
-      confidence: judgment.confidence,
-      reason: judgment.reason,
-      stage: 2,
-    };
-  } catch (err) {
-    console.error('[FreshChatKeeper] judgeMessage error:', err);
-    return { messageId: message.id, verdict: uncertainVerdict(filterMode), stage: 2 };
-  }
-}
-
-// ─── ヘルパー ─────────────────────────────────────────────────────────────────
-
-function formatProgress(progress: UserProgress | null | undefined): string {
-  if (!progress) return '未設定（ゲーム開始前として扱う）';
-  if (progress.progressModel === 'chapter' && progress.currentChapterId) {
-    return `チャプター「${progress.currentChapterId}」まで通過済み`;
-  }
-  if (progress.progressModel === 'event' && progress.completedEventIds?.length) {
-    return `通過済みイベント: ${progress.completedEventIds.join(', ')}`;
-  }
-  return '未設定（ゲーム開始前として扱う）';
-}
-
-/**
- * LLM プロンプト用のコンテキスト説明文を生成する。
- *
- * ジャンルテンプレートのみ使用時（ゲーム知識ベースの進行状況未設定）と
- * ゲーム知識ベースあり + ジャンルテンプレート併用の両ケースに対応する。
- */
-function buildContextDescription(
-  gameId: string | null | undefined,
-  progressDescription: string,
-  selectedGenreTemplates: string[],
-  videoTitle?: string,
-): string {
-  const genreNames = selectedGenreTemplates
-    .map((id) => GENRE_NAMES[id] ?? id)
-    .filter(Boolean);
-
-  const parts: string[] = [];
-
-  if (genreNames.length > 0) {
-    const genreLabel = genreNames.join('・');
-    const hasProgress = progressDescription !== '未設定（ゲーム開始前として扱う）';
-    if (hasProgress && gameId) {
-      // ゲームKB + ジャンルテンプレート + 進行状況あり
-      parts.push(`ユーザーは${genreLabel}ジャンルのゲームを視聴中です。`);
-      parts.push(`ゲーム: ${gameId}`);
-      parts.push(`現在の進行状況: ${progressDescription}`);
-      parts.push(`ジャンル（テンプレート）: ${genreLabel}`);
-    } else {
-      // ジャンルテンプレートのみ（gameId/progress 不明）
-      parts.push(`ユーザーは${genreLabel}ジャンルのゲーム配信を視聴中です。具体的なゲームタイトルや進行状況は不明です。`);
-      parts.push(`ジャンル（テンプレート）: ${genreLabel}`);
-    }
-  } else if (gameId) {
-    // ジャンルテンプレートなし（ゲーム知識ベースのみ）
-    parts.push(`ゲーム: ${gameId}`);
-    parts.push(`現在の進行状況: ${progressDescription}`);
-  }
-
-  // 動画タイトルが提供されている場合は追加（ゲーム自動推測に活用）
-  if (videoTitle) {
-    parts.push(`配信の動画タイトル: ${videoTitle}`);
-    parts.push(`このタイトルからプレイ中のゲームを推測し、そのゲームの一般的な知識を踏まえてネタバレ判定を行ってください。ゲーム知識ベースが提供されている場合はそちらを優先してください。`);
-    parts.push(`注意: タイトルに「ネタバレあり」等の表記がある場合、これは「この配信自体にネタバレが含まれる」という未プレイ視聴者への注意書きであり、チャットでのネタバレコメントを視聴者に許可しているわけではありません。チャットコメントの判定基準はこの表記に関わらず同じように適用してください。`);
-  }
-
-  return parts.join('\n');
-}
-
 /** LLM 判定失敗時の verdict をモードに応じて決定する。lenient では安全側（allow）に倒す。 */
-function uncertainVerdict(filterMode: FilterMode): FilterVerdict {
+function uncertainVerdict(filterMode: LegacyFilterMode): FilterVerdict {
   return filterMode === 'lenient' ? 'allow' : 'uncertain';
 }
 
-function categoryToVerdict(category: SpoilerCategory, filterMode: FilterMode): FilterVerdict {
+function categoryToVerdict(category: SpoilerCategory, filterMode: LegacyFilterMode): FilterVerdict {
   switch (category) {
     case 'direct_spoiler':
       return 'block';
@@ -339,28 +439,6 @@ function categoryToVerdict(category: SpoilerCategory, filterMode: FilterMode): F
     case 'safe':
       return 'allow';
   }
-}
-
-function chunkArray<T>(arr: T[], size: number): T[][] {
-  const chunks: T[][] = [];
-  for (let i = 0; i < arr.length; i += size) {
-    chunks.push(arr.slice(i, i + size));
-  }
-  return chunks;
-}
-
-/**
- * genre（文字列）と selectedGenreTemplates（配列）を統合して有効なIDリストを返す。
- * genre は外部クライアント・テスト用のショートハンドで、selectedGenreTemplates が優先される。
- */
-function normalizeGenreTemplates(body: JudgeRequest): string[] {
-  if (body.selectedGenreTemplates && body.selectedGenreTemplates.length > 0) {
-    return body.selectedGenreTemplates;
-  }
-  if (body.genre) {
-    return [body.genre];
-  }
-  return [];
 }
 
 function jsonOk(data: unknown): Response {
@@ -376,3 +454,19 @@ function jsonError(message: string, status: number): Response {
     headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
   });
 }
+
+// ─── テスト用エクスポート ─────────────────────────────────────────────────────
+// 単体テストから内部ヘルパーを直接検証するためのエクスポート。
+// 実行時のエンドポイントは default export 経由なので、以下を import しても
+// プロキシの挙動には影響しない。
+
+export const __test__ = {
+  isNewFormat,
+  normalizeRequest,
+  legacyModeToStrength,
+  strengthToLegacyMode,
+  buildGameContextFromLegacy,
+  buildGenreTemplateField,
+  uncertainVerdict,
+  categoryToVerdict,
+};
