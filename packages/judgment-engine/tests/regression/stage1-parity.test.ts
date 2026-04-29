@@ -1,19 +1,29 @@
 /**
  * Stage 1 リグレッションテスト（parity test）。
  *
- * 既存 filter.ts (apps/chrome-ext/src/content) から取得した期待値が
- * stage1-fixtures.ts に静的に埋め込まれている。本テストはその期待値に対して
- * 同等のロジックを適用し、Phase 2 移植後も挙動が変わらないことを保証する。
+ * 既存 `apps/chrome-ext/src/content/filter.ts` から取得した期待値が
+ * `stage1-fixtures.ts` に静的に埋め込まれている。本テストはその期待値に対して
+ * judgment-engine 側の **新実装**（packages/judgment-engine/src/stage1/）を実行して
+ * 一致を確認する。新旧2つの独立した実装が同じ入力で同じ結果を返すことが
+ * 確認できて初めて、parity 検証として意味を持つ。
  *
- * P2-STAGE1-01 時点では、judgment-engine 側にまだ Stage 1 実装が無いため、
- * **filter.ts のロジックを直接ここで再実行**して期待値との一致を確認する。
- * これは generator が同じロジックで生成した期待値を再実行で確認するだけの
- * 自己整合チェックだが、フィクスチャ自体が正しく構築・シリアライズされている
- * ことの検証になる。
+ * P2-STAGE1-02 で `stage1-impl-snapshot.ts` から新実装に切り替え済み。
  *
- * P2-STAGE1-02 以降:
- * - judgment-engine の新実装に同じフィクスチャを通すことで parity を確認する
- * - 本ファイルを差し替える形で新実装に対するテストに変える
+ * **検証範囲の限定（重要）**:
+ * 本テストは filter.ts から生成された 61 件のフィクスチャに対する新旧 parity を
+ * 検証するが、検証範囲は **下層マッチ関数**（`matchesKeyword`,
+ * `matchesCustomNGWord`, `matchesGenreTemplate` 等）に限定される。これらは
+ * `runStage1` の内部評価で言えば custom_blocklist と keyword_match の2経路に対応する。
+ *
+ * 新実装で導入された `obviously_safe` 経路（`isObviouslySafe` による短い定型反応・
+ * 2文字以下を即 pass する最適化）は本テストの対象外。`runStage1` 全体の動作確認は
+ * `tests/stage1/run-stage1.test.ts` と `tests/stage1/obviously-safe.test.ts` で
+ * カバーする。
+ *
+ * 旧 filter.ts は obviously_safe ルールを持たないため、もし parity をこれに拡張
+ * すれば必ず差分が出る（旧: null/Stage 2 行き、新: pass/即決）。この差分は
+ * 設計書 `dev-docs/phase-2-engine-split.md` §Stage 1の移植 で意図的な最適化として
+ * 承認されている。
  */
 
 import { describe, it, expect } from 'vitest';
@@ -36,7 +46,7 @@ import {
   matchesKeywordForStage2,
   buildKeywordSet,
   buildDescriptionPhraseSet,
-} from './stage1-impl-snapshot.js';
+} from '../../src/stage1/index.js';
 import { getAllGenreTemplates } from '@fresh-chat-keeper/knowledge-base';
 
 const ALL_GENRES = getAllGenreTemplates();

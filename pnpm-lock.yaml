@@ -78,13 +78,13 @@ importers:
 
   packages/judgment-engine:
     dependencies:
+      '@fresh-chat-keeper/knowledge-base':
+        specifier: workspace:*
+        version: link:../knowledge-base
       '@fresh-chat-keeper/shared':
         specifier: workspace:*
         version: link:../shared
     devDependencies:
-      '@fresh-chat-keeper/knowledge-base':
-        specifier: workspace:*
-        version: link:../knowledge-base
       typescript:
         specifier: ^5.5.0
         version: 5.9.3

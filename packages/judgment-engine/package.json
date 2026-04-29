@@ -7,6 +7,10 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./stage1": {
+      "import": "./dist/stage1/index.js",
+      "types": "./dist/stage1/index.d.ts"
     }
   },
   "main": "./dist/index.js",
@@ -17,10 +21,10 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@fresh-chat-keeper/knowledge-base": "workspace:*",
     "@fresh-chat-keeper/shared": "workspace:*"
   },
   "devDependencies": {
-    "@fresh-chat-keeper/knowledge-base": "workspace:*",
     "typescript": "^5.5.0",
     "vitest": "^2.0.0"
   }

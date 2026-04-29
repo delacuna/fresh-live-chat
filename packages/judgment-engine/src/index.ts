@@ -5,10 +5,14 @@
  * Chrome拡張・Cloudflare Workers・Node.js から共通利用するため、
  * DOM API や chrome.* 等の環境固有APIには依存しない。
  *
- * 公開関数は後続タスクで段階的に追加する:
- *   - P2-STAGE1-02: `runStage1` / `judgeStage1Only`
- *   - P2-STAGE2-01: Stage 2 実装
- *   - P2-CACHE-01: `createCache`
+ * Phase 2 時点の公開API:
+ *   - 型定義（types.ts）
+ *   - Stage 1: `runStage1` および下層マッチ関数（stage1/）
+ *   - Stage 2: モデルルーター・キャッシュ・Transport抽象（stage2/）
+ *
+ * 後続フェーズで追加予定:
+ *   - 統合エントリ `judgeMessage` / `judgeMessageBatch`
+ *   - プロンプトビルダー / バッチャー（P2-STAGE2-02 / -04）
  */
 
 export type {
@@ -20,3 +24,20 @@ export type {
   JudgeRequestPayload,
   JudgeResponsePayload,
 } from './types.js';
+
+export type { Stage1Result } from './stage1/index.js';
+export { runStage1, isObviouslySafe } from './stage1/index.js';
+
+// Stage 2 building blocks（Phase 2 で実装、judgeMessage 等の統合は後続）
+export type { ModelTier, ModelConfig } from './stage2/model-router.js';
+export { selectModel, getEffectiveModel } from './stage2/model-router.js';
+
+export type {
+  CacheStorage,
+  CacheEntry,
+  CacheOptions,
+} from './stage2/cache.js';
+export { JudgmentCache, createMemoryStorage } from './stage2/cache.js';
+
+export type { MockTransportHandler } from './stage2/api-client.js';
+export { createMockTransport, createFailingTransport } from './stage2/api-client.js';
