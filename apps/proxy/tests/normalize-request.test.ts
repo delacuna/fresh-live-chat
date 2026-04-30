@@ -27,6 +27,52 @@ describe('worker default export', () => {
   });
 });
 
+describe('handleJudge: バリデーション', () => {
+  // インメモリ KV モック（rate-limit 用、最低限のメソッドのみ実装）
+  function createMockKV(): unknown {
+    const store = new Map<string, string>();
+    return {
+      async get(key: string) {
+        return store.get(key) ?? null;
+      },
+      async put(key: string, value: string) {
+        store.set(key, value);
+      },
+    };
+  }
+
+  function buildEnv() {
+    return { ANTHROPIC_API_KEY: 'test-key', RATE_LIMIT_KV: createMockKV() };
+  }
+
+  function buildRequest(body: unknown, token = 'test-uuid') {
+    return new Request('http://localhost/api/judge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-fck-token': token },
+      body: JSON.stringify(body),
+    });
+  }
+
+  it('21 件以上のメッセージは 400 で拒否される（MAX_MESSAGES_PER_REQUEST 上限）', async () => {
+    const messages = Array.from({ length: 21 }, (_, i) => ({ id: String(i), text: `m${i}` }));
+    const req = buildRequest({ messages, gameId: 'g' });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const res = await workerModule.fetch(req, buildEnv() as any);
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toContain('20');
+  });
+
+  it('20 件ちょうどは上限で許可される（実通信は test-key が無効なので fallback verdict が返る）', async () => {
+    const messages = Array.from({ length: 20 }, (_, i) => ({ id: String(i), text: `m${i}` }));
+    const req = buildRequest({ messages, gameId: 'g' });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const res = await workerModule.fetch(req, buildEnv() as any);
+    // 上限チェックを通過 → 200 (Anthropic API 失敗で uncertain fallback) または何らかの非 400
+    expect(res.status).not.toBe(400);
+  });
+});
+
 describe('isNewFormat', () => {
   it('returns true when body has a `context` object', () => {
     expect(

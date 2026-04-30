@@ -103,6 +103,13 @@ interface NormalizedRequest {
 const RATE_LIMIT_MAX = 30;
 const RATE_LIMIT_WINDOW_SECONDS = 60;
 
+/**
+ * 1リクエストあたりの最大メッセージ数。
+ * judgment-engine の Stage2Batcher.maxBatch (デフォルト 20) と同値。
+ * これを超えるとトークン予算超過 / DOS リスクがあるため 400 で拒否する。
+ */
+const MAX_MESSAGES_PER_REQUEST = 20;
+
 // ─── CORS ────────────────────────────────────────────────────────────────────
 
 const CORS_HEADERS: HeadersInit = {
@@ -161,6 +168,9 @@ async function handleJudge(request: Request, env: Env): Promise<Response> {
   const messages = bodyObj['messages'];
   if (!Array.isArray(messages) || messages.length === 0) {
     return jsonError('messages must be a non-empty array', 400);
+  }
+  if (messages.length > MAX_MESSAGES_PER_REQUEST) {
+    return jsonError(`messages must not exceed ${MAX_MESSAGES_PER_REQUEST} items`, 400);
   }
 
   // 旧形式は gameId or genre/selectedGenreTemplates が必須（新形式は context があれば OK）
