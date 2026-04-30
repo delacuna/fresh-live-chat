@@ -150,55 +150,67 @@ export function startArchiveMode(mode: 'archive' | 'live' = 'archive'): void {
   chrome.storage.local.set({ [FILTER_COUNT_KEY]: 0 });
 
   // Stage 2 キャッシュの読み込みとトークン取得を並行して初期化
-  Promise.all([initStage2Cache(), getOrCreateAnonToken()]).then(([, token]) => {
-    anonToken = token;
-  });
-
-  loadSettings().then((settings) => {
-    currentSettings = settings;
-    currentKeywords = buildKeywordsFromSettings(settings);
-
-    chrome.storage.onChanged.addListener((changes, area) => {
-      if (area !== 'local' || !changes[STORAGE_KEY]) return;
-      const prev = changes[STORAGE_KEY].oldValue as Settings | undefined;
-      const next = changes[STORAGE_KEY].newValue as Settings;
-
-      const displayModeChanged = prev?.displayMode !== next.displayMode;
-      const onlyDisplayModeChanged =
-        displayModeChanged &&
-        prev?.enabled === next.enabled &&
-        prev?.gameId === next.gameId &&
-        prev?.filterMode === next.filterMode &&
-        JSON.stringify(prev?.progressByGame) === JSON.stringify(next.progressByGame) &&
-        JSON.stringify(prev?.customNgWords) === JSON.stringify(next.customNgWords) &&
-        JSON.stringify(prev?.selectedGenreTemplates) === JSON.stringify(next.selectedGenreTemplates);
-
-      currentSettings = next;
-      currentKeywords = buildKeywordsFromSettings(next);
-
-      if (!itemsContainerRef) return;
-
-      if (onlyDisplayModeChanged) {
-        // displayMode のみ変更: 復元→再フィルタせず、表示方式だけ直接切り替える（フラッシュ防止）
-        isUpdatingDisplayMode = true;
-        itemsContainerRef.querySelectorAll('[data-fck-filtered="true"]').forEach((el) => {
-          switchDisplayMode(el, next.displayMode, () => {
-            const text = el.getAttribute('data-fck-original') ?? el.textContent?.trim() ?? '';
-            if (text) revealedTexts.add(text);
-          });
-        });
-        isUpdatingDisplayMode = false;
-      } else {
-        // 設定変更: Stage 2 キューをクリアして再処理
-        clearStage2Queue();
-        reprocessAll(itemsContainerRef);
-      }
+  Promise.all([initStage2Cache(), getOrCreateAnonToken()])
+    .then(([, token]) => {
+      anonToken = token;
+    })
+    .catch((err) => {
+      // chrome.storage 失敗等。anonToken が空のままだと Stage 2 が動かないが、
+      // Stage 1 は引き続き機能する。サイレント失敗を避けるため必ずログ出力する。
+      console.error('[FreshChatKeeper] 起動時初期化エラー（Stage 2 キャッシュ/トークン）:', err);
     });
 
-    if (settings.enabled) {
-      waitForItemsContainer();
-    }
-  });
+  loadSettings()
+    .then((settings) => {
+      currentSettings = settings;
+      currentKeywords = buildKeywordsFromSettings(settings);
+
+      chrome.storage.onChanged.addListener((changes, area) => {
+        if (area !== 'local' || !changes[STORAGE_KEY]) return;
+        const prev = changes[STORAGE_KEY].oldValue as Settings | undefined;
+        const next = changes[STORAGE_KEY].newValue as Settings;
+
+        const displayModeChanged = prev?.displayMode !== next.displayMode;
+        const onlyDisplayModeChanged =
+          displayModeChanged &&
+          prev?.enabled === next.enabled &&
+          prev?.gameId === next.gameId &&
+          prev?.filterMode === next.filterMode &&
+          JSON.stringify(prev?.progressByGame) === JSON.stringify(next.progressByGame) &&
+          JSON.stringify(prev?.customNgWords) === JSON.stringify(next.customNgWords) &&
+          JSON.stringify(prev?.selectedGenreTemplates) === JSON.stringify(next.selectedGenreTemplates);
+
+        currentSettings = next;
+        currentKeywords = buildKeywordsFromSettings(next);
+
+        if (!itemsContainerRef) return;
+
+        if (onlyDisplayModeChanged) {
+          // displayMode のみ変更: 復元→再フィルタせず、表示方式だけ直接切り替える（フラッシュ防止）
+          isUpdatingDisplayMode = true;
+          itemsContainerRef.querySelectorAll('[data-fck-filtered="true"]').forEach((el) => {
+            switchDisplayMode(el, next.displayMode, () => {
+              const text = el.getAttribute('data-fck-original') ?? el.textContent?.trim() ?? '';
+              if (text) revealedTexts.add(text);
+            });
+          });
+          isUpdatingDisplayMode = false;
+        } else {
+          // 設定変更: Stage 2 キューをクリアして再処理
+          clearStage2Queue();
+          reprocessAll(itemsContainerRef);
+        }
+      });
+
+      if (settings.enabled) {
+        waitForItemsContainer();
+      }
+    })
+    .catch((err) => {
+      // chrome.storage 失敗等で設定ロードに失敗。フィルタが全く起動せず
+      // 全コメント素通しになるため必ずログ出力する。
+      console.error('[FreshChatKeeper] 設定ロード失敗（フィルタ未起動）:', err);
+    });
 }
 
 // ─── 設定・キーワード構築 ─────────────────────────────────────────────────────
