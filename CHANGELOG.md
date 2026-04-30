@@ -20,6 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 進行状況・フィルタ強度を変更したとき、ユーザーがクリックして展開済みのコメントが新基準で再フィルタされない bug を修正
 - 設定保存時に `version: 2` フィールドが剥がれてマイグレーションが繰り返し実行される bug を修正
 - 複数ジャンルテンプレートを選択した状態で、新エンジン経由では最初の 1 つしか proxy に送られない bug を修正
+- proxy のリクエストサイズを 20 メッセージで上限化し、トークン予算超過 / DOS を防止
+- chrome-ext 起動時の Promise 連鎖に `.catch()` ハンドラを追加（`chrome.storage` 失敗時のサイレント停止を防止）
+
+### Internal
+
+- `filter-orchestrator.ts` から dead な `verdictFromCache` import を削除
 
 ### Behavior Changes for Users
 
